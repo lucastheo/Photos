@@ -11,7 +11,7 @@ In Go web applications, sharing a single struct across HTTP handlers (`json` tag
 
 1. **Strict 3-Struct Separation:**
    - `internal/adapter/httpapi` defines HTTP Request/Response DTO structs (`json:"..."` tags only) and explicit DTO ↔ Domain mappers.
-   - `internal/domain` defines pure Domain Objects with **zero** struct tags (`no json`, `no db`) and **zero** interfaces, importing only the Go standard library (`$gostd`).
+   - `internal/domain` defines pure Domain Objects with **zero** struct tags (`no json`, `no db`) and **zero** interfaces, importing only the Go standard library (`$gostd`) and `golang.org/x/text/unicode/norm` (for Unicode NFC normalization of emoji tags and relative paths).
    - `internal/adapter/sqlite` defines Database Entity structs (`db:"..."` tags only) and explicit Entity ↔ Domain mappers.
 2. **"Accept Interfaces, Return Structs":**
    - Every constructor (`New...`) and function returns a concrete struct, enforced by `ireturn` in `golangci-lint`.

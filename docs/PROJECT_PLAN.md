@@ -25,16 +25,16 @@ flowchart TD
 **Goal:** Establish the repository structure, automated linters (including `depguard` for the 3-struct separation and `lint-max-file` at 1,000 lines), pure-Go SQLite connection with WAL auto-checkpointing, and repository implementations.
 
 ### Tasks
-- [ ] **1.1 Repository, Tooling & Agent Rulebook Setup:**
+- [x] **1.1 Repository, Tooling & Agent Rulebook Setup:**
   - Initialize Go module (`go.mod`) and frontend workspace (`web/package.json` with Vite, TypeScript, Lit, Vitest, ESLint).
   - Install `GoogleChrome/modern-web-guidance` skills into the workspace for frontend implementation guidance.
   - Create root `AGENTS.md` (AI & contributor rulebook), `.gitmessage` (Conventional Commits template), `.github/pull_request_template.md` (PR quality gate checklist), and initial Architecture Decision Records (`docs/adr/0001..0004`).
   - Create `.golangci.yml` with `depguard` (enforcing strict separation between `internal/domain`, `internal/usecase`, `internal/adapter/httpapi`, `internal/adapter/sqlite`, and `internal/adapter/media`), `ireturn` (`allow: [anon, error, empty, stdlib, generic]`, enforcing **"Accept interfaces, return structs"**), `funlen` (max 60 lines in production code, excluding `*_test.go`), and `revive` (`exported` + `package-comments` enforcing GoDoc comments on all packages and exported symbols).
   - Create root `Makefile` with targets: `build`, `run`, `test-unit`, `test-integration`, `test-coverage` (enforcing **> 90.0%** statement/line coverage per layer across Go and Frontend), `test-perf` (running Go benchmarks and performance latency assertions), `lint`, `lint-max-file` (enforcing ≤ 1,000 lines per file), and `check` (running all gates).
-- [ ] **1.2 Pure Domain Models (`internal/domain`):**
+- [x] **1.2 Pure Domain Models (`internal/domain`):**
   - Define pure Go structs (`Photo`, `PhotoFile`, `ScannedFile`, `DuplicateGroup`, `EXIFMetadata`, `ViewEvent`, `EmojiTagCount`, `PhotoFilter`, `SyncReport`, `LibraryStats`) with **zero** JSON or DB struct tags and **zero** interfaces (interfaces live at their consumers in `usecase` and `adapter/httpapi`).
   - Write table-driven unit tests (`internal/domain/*_test.go`) achieving `> 90%` coverage on domain validation (including NFC-normalized emoji tag validation, still-photo-only `stack_key` computation, and media format priority `CR3 > HEIC > JPG`).
-- [ ] **1.3 SQLite Entities, Migrations & Repositories (`internal/adapter/sqlite`):**
+- [x] **1.3 SQLite Entities, Migrations & Repositories (`internal/adapter/sqlite`):**
   - Configure `modernc.org/sqlite` connection pool with DSN pragmas (`_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)`) and automatic `wal_checkpoint(TRUNCATE)` helper for safe database sharing/syncing.
   - Implement versioned migration runner (`schema_migrations`) that **automatically creates a backup copy (`photos.db.bak.v<version>_<timestamp>`)** before applying any pending SQL migrations.
   - Write embedded SQL migrations (`001_initial_schema.sql`) creating `photos`, `photo_files`, `photo_views`, `photo_tags`, and `sync_runs`.

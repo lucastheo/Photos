@@ -65,7 +65,7 @@ The backend is written in Go and follows **Hexagonal / Clean Architecture**. A c
 | Layer | Package | Struct Type | Allowed Tags & Dependencies | Responsibility |
 | :--- | :--- | :--- | :--- | :--- |
 | **Transport (HTTP)** | `internal/adapter/httpapi` | **Request / Response DTOs** | `json:"..."` tags only. Imports `domain`. Defines consumer interfaces for `usecase`. | Parse & validate HTTP inputs; format HTTP JSON responses. |
-| **Domain** | `internal/domain` | **Domain Objects** | **Zero struct tags** (`no json`, `no db`). Imports Go stdlib only. | Pure business entities, value objects, filter criteria, scan metadata types, and sentinel errors. |
+| **Domain** | `internal/domain` | **Domain Objects** | **Zero struct tags** (`no json`, `no db`). Imports Go stdlib (`$gostd`) and `golang.org/x/text/unicode/norm` (for Unicode NFC normalization of emoji tags and relative paths). | Pure business entities, value objects, filter criteria, scan metadata types, and sentinel errors. |
 | **Application** | `internal/usecase` | **Use Case Services** | Imports `domain`, stdlib, and `golang.org/x/sync/errgroup`. Defines consumer interfaces for repositories/adapters. | Orchestrates business rules (1.5s view recording, incremental sync reconciliation, search). |
 | **Persistence (SQLite)** | `internal/adapter/sqlite` | **Entity Structs** | `db:"..."` / SQL scan targets only. Imports `domain` and `modernc.org/sqlite`. | Represent exact SQLite table rows and map to/from `domain` objects. |
 | **Media & Filesystem** | `internal/adapter/media` | **Adapter Structs** | Imports `domain`, stdlib, and `golang.org/x/sync/errgroup`. | File walking, `SHA-256` hashing, EXIF parsing, `CR3`/`HEIC`/video thumbnail & preview generation. |
@@ -79,7 +79,7 @@ The backend is written in Go and follows **Hexagonal / Clean Architecture**. A c
 │       └── main.go                     # Entrypoint, config loading, concrete dependency wiring
 ├── internal/
 │   ├── config/                         # Env/file configuration loader
-│   ├── domain/                         # PURE DOMAIN LAYER (stdlib only, no interfaces)
+│   ├── domain/                         # PURE DOMAIN LAYER (stdlib + unicode/norm only, no interfaces)
 │   │   ├── photo.go                    # Photo, PhotoFile, MediaType, MediaFormat, EXIFMetadata structs
 │   │   ├── view.go                     # ViewEvent, ViewAction, ViewStats domain structs
 │   │   ├── filter.go                   # PhotoFilter, SortField, SortOrder, PaginatedPhotos structs
@@ -274,7 +274,7 @@ All Go packages strictly follow the **"Accept interfaces, return structs"** desi
 `golangci-lint` is configured with both `depguard` and `ireturn`:
 - **`ireturn`:** Configured with `allow: [anon, error, empty, stdlib, generic]` so functions returning `(*ConcreteStruct, error)` pass linting while failing if any function or constructor returns a custom interface instead of a concrete struct.
 - **`depguard`:**
-  - `internal/domain` **can only** import Go standard library packages (`$gostd`).
+  - `internal/domain` **can only** import Go standard library packages (`$gostd`) and `golang.org/x/text/unicode/norm` (for Unicode NFC normalization of emoji tags and relative paths).
   - `internal/usecase` **can only** import `internal/domain`, `$gostd`, and `golang.org/x/sync/errgroup`.
   - `internal/adapter/httpapi` **can only** import `internal/domain`, `$gostd`, and `golang.org/x/time/rate` (it never imports `usecase`, `sqlite`, or `media` directly because it defines its own consumer interfaces!).
   - `internal/adapter/sqlite` **can only** import `internal/domain`, `modernc.org/sqlite`, and `$gostd`.
