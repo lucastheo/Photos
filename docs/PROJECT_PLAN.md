@@ -1,6 +1,6 @@
 # Photo View Tracker — Implementation Project Plan
 
-This project plan breaks down the implementation described in [docs/SPECIFICATION.md](file:///home/theo/Projects/Photos/docs/SPECIFICATION.md) into **5 sequential phases**. Every phase ends with passing unit tests, integration tests, **strictly `> 90%` test coverage (`make test-coverage`)**, linters (`depguard` + `ireturn`), and the 1,000-line `lint-max-file` check.
+This project plan breaks down the implementation described in [docs/SPECIFICATION.md](file:///home/theo/Projects/Photos/docs/SPECIFICATION.md) into **6 sequential phases**. Every phase ends with passing unit tests, integration tests, **strictly `> 90%` test coverage (`make test-coverage`)**, linters (`depguard` + `ireturn`), and the 1,000-line `lint-max-file` check.
 
 ---
 
@@ -13,8 +13,9 @@ flowchart TD
     P3["Phase 3: Core Use Cases, Authentication & HTTP REST API (DTO <-> Domain <-> Entity)"]
     P4["Phase 4: Frontend Web App (TypeScript + Lit + modern-web-guidance)"]
     P5["Phase 5: Single-Binary Embedding, E2E Integration Tests & Operational Docs"]
+    P6["Phase 6: Performance Benchmarking, Scale Verification & Final Sign-Off"]
 
-    P1 --> P2 --> P3 --> P4 --> P5
+    P1 --> P2 --> P3 --> P4 --> P5 --> P6
 ```
 
 ---
@@ -43,7 +44,6 @@ flowchart TD
 ### Phase 1 Deliverable & Verification
 - `make lint` and `make lint-max-file` pass.
 - `make test-unit` and `make test-integration` pass (covering `internal/domain` and `internal/adapter/sqlite`).
-- SQLite query benchmarks (`internal/adapter/sqlite/*_bench_test.go`) verify `< 25ms` `p95` search latency on a seeded 10,000-photo database.
 - `make test-coverage` passes with **> 90.0%** coverage across all Phase 1 packages.
 
 ---
@@ -73,7 +73,6 @@ flowchart TD
 ### Phase 2 Deliverable & Verification
 - Table-driven unit tests (`internal/usecase/sync_library_test.go`) using in-memory consumer-interface fakes verifying new file import, unchanged fast-skip, moved file `view_count` preservation, missing file marking, and missing purge.
 - Integration tests (`internal/adapter/media/*_integration_test.go`) in `t.TempDir()` with sample fixtures (`.jpg`, `.cr3`, `.heic`, `.mp4`) verifying `SHA-256` hashing, EXIF extraction, and thumbnail/preview file generation.
-- Sync & hashing benchmarks (`internal/usecase/*_bench_test.go`, `internal/adapter/media/*_bench_test.go`) verify `< 500ms` fast-skip incremental scan over 10,000 unchanged files and bounded `SYNC_WORKERS` / `PREVIEW_WORKERS` throughput.
 - `make check` (`lint-max-file` + `lint` + `test-coverage`) passes with **> 90.0%** coverage across `internal/domain`, `internal/usecase`, `internal/adapter/sqlite`, and `internal/adapter/media`.
 
 ---
@@ -104,7 +103,6 @@ flowchart TD
 ### Phase 3 Deliverable & Verification
 - Table-driven unit tests for `TrackView`, `AdjustViewCount`, `SearchPhotos`, `Auth` use cases, and `httpapi/mapper_test.go` DTO conversions.
 - HTTP integration tests (`internal/adapter/httpapi/*_integration_test.go` with `httptest.Server`) verifying end-to-end request DTO validation (`400`), auth cookie & bypass (`401`/`200`), view counting & history sync (`POST`/`PATCH`), search filters, and `206 Partial Content` HTTP Range media streaming.
-- HTTP benchmarks (`internal/adapter/httpapi/*_bench_test.go`) verify `GET /api/v1/photos` serialization and cached thumbnail/preview serving latency under concurrent load.
 - `make check` passes with **> 90.0%** coverage across every Go package (`domain`, `usecase`, `adapter/httpapi`, `adapter/sqlite`, `adapter/media`).
 
 ---
@@ -161,10 +159,32 @@ flowchart TD
     3. **1.5s Dwell Counter, Emoji Tagging & Manual Controls:** Verify fast skip (`< 1.5s`, stays `0`) vs. dwell (`>= 1.5s`, increments to `1` and persists on `F5`), manual `+1` / `-1` / `Reset` buttons, and adding an emoji tag (`❤️`) in the lightbox then filtering the gallery by `❤️`.
     4. **Slideshow Mode:** Start slideshow in `<dialog>` lightbox and verify auto-advance increments view counts.
     5. **Disk Rename + Re-import:** Rename/move a viewed photo file on disk during the test, click **"Re-import"** in `/library`, and verify `view_count` is preserved under the new filename.
-    6. **Scale & UI Performance:** Seed 1,000+ photos and verify Gallery Grid initial render, filter transitions, smooth scroll (`content-visibility: auto` + `loading="lazy"`), and Lightbox open/navigation stay within latency budgets (`make test-perf`).
 - [ ] **5.3 User, Feature & Operational Documentation (`README.md` & `docs/FEATURES.md`):**
   - Write `README.md` covering quickstart (native & Docker Compose), `.env` / CLI flags (`LIBRARY_PATH`, `DB_PATH`, `CACHE_PATH`, `PORT`, `AUTH_DISABLED`, `AUTH_PASSWORD`, `SYNC_WORKERS`), external media dependencies (`exiftool`, `ffmpeg`, `libheif`), and backup/sharing instructions for the SQLite database.
   - Write `docs/FEATURES.md` documenting how View Counting (1.5s dwell + manual controls), `RAW + JPEG` Stacking, Exact Duplicate Tracking, Emoji Tagging, GPS Filtering, and Incremental Re-import work.
 
 ### Phase 5 Deliverable & Verification
-- `make check` runs all linters (`depguard`, `ireturn`, `eslint`, `lint-max-file` ≤ 1,000 lines), unit tests, integration tests, **> 90.0%** test coverage validation (`make test-coverage`), performance benchmarks (`make test-perf`), and the standalone black-box Playwright E2E suite (`make test-e2e`).
+- `make check` runs all linters (`depguard`, `ireturn`, `eslint`, `lint-max-file` ≤ 1,000 lines), unit tests, integration tests, **> 90.0%** test coverage validation (`make test-coverage`), and the standalone black-box Playwright E2E suite (`make test-e2e`).
+
+---
+
+## Phase 6: Performance Benchmarking, Scale Verification & Final Sign-Off
+
+**Goal:** Verify that the complete application meets latency, memory, and throughput budgets on large personal photo libraries (10,000+ photos/videos) and sign off on all quality gates.
+
+### Tasks
+- [ ] **6.1 SQLite & Incremental Sync Scale Benchmarks (`internal/adapter/sqlite/*_bench_test.go`, `internal/usecase/*_bench_test.go`, `internal/adapter/media/*_bench_test.go`):**
+  - Seed a 10,000-photo SQLite database in `t.TempDir()` (with `photo_files`, `photo_views`, and `photo_tags`) and benchmark paginated `SearchPhotos` queries across filter combinations (`min_views`/`max_views`, `emoji_tags` `AND`, `untagged`, `formats`, `folder`, `has_gps`/bounding box, `sort_by=random_seeded`) plus concurrent `TrackView` WAL writes (`p95 < 25ms`).
+  - Inspect `EXPLAIN QUERY PLAN` to confirm composite indexes (`idx_photos_status_views`, `idx_photo_tags_emoji`, `idx_photos_gps`) are used.
+  - Benchmark `SyncLibraryUseCase` fast-skip incremental scan over 10,000 unchanged files (`< 500ms` metadata diff, 0 bytes re-hashed) and streaming `SHA-256` hashing with bounded `SYNC_WORKERS` / `PREVIEW_WORKERS`.
+- [ ] **6.2 HTTP API & Cached Media Load Benchmarks (`internal/adapter/httpapi/*_bench_test.go`):**
+  - Benchmark `GET /api/v1/photos` JSON serialization and `GET /api/v1/photos/{id}/thumbnail` / `preview` serving (`ETag`, `Cache-Control: immutable`, `206 Partial Content` byte-range streaming) under concurrent HTTP requests.
+- [ ] **6.3 Frontend & E2E Scale Performance (`e2e/` Playwright Performance Spec):**
+  - Boot the compiled single Go binary against a seeded 1,000+ photo dataset and measure Gallery Grid initial render, filter transitions, smooth scroll (`content-visibility: auto` + `loading="lazy"`), and `<dialog>` Lightbox open/navigation latency (`p95 < 100ms` UI transition).
+- [ ] **6.4 Profiling, Bottleneck Tuning & Final Release Sign-Off:**
+  - Profile any failing latency/memory budgets with `pprof` / Playwright traces and tune queries, worker pool bounds, or rendering paths as needed.
+  - Wire `make test-perf` into CI and `make check`.
+
+### Phase 6 Deliverable & Verification
+- `make test-perf` passes all Go benchmark assertions (`p95 < 25ms` SQLite search on 10,000+ photos, `< 500ms` fast-skip scan) and Playwright UI scale budgets.
+- Full `make check` (`lint-max-file`, `lint`, `test-coverage > 90%`, `test-e2e`, `test-perf`) passes green as the final project sign-off.
