@@ -53,18 +53,18 @@ flowchart TD
 **Goal:** Build the filesystem scanner, incremental `SHA-256` content tracker, EXIF metadata parser, and cached thumbnail/preview generator for standard images, RAW (`.CR3`), `.HEIC`, and videos.
 
 ### Tasks
-- [ ] **2.1 Incremental Filesystem Walker, `os.Root` Containment & `SHA-256` Hasher (`internal/adapter/media`):**
+- [x] **2.1 Incremental Filesystem Walker, `os.Root` Containment & `SHA-256` Hasher (`internal/adapter/media`):**
   - Confine all disk access in `LIBRARY_PATH` and `CACHE_PATH` (defaulting to `./data/cache` outside `LIBRARY_PATH`) using Go's `os.Root` API to prevent symlink escapes or path traversal.
   - Walk `LIBRARY_PATH` (ignoring hidden `.*` directories, `@eaDir`, AppleDouble `._*` files, and `0`-byte files) and compute NFC-normalized paths relative to `LIBRARY_PATH`.
   - Implement fast-path check: compare `(relative_path, file_size, mod_time_unix_ns)` to skip unchanged files without re-hashing.
   - Stream-hash new or modified files with `SHA-256` using a **bounded worker pool** (`SYNC_WORKERS`, defaulting to `runtime.NumCPU()`) via `errgroup.WithContext`.
-- [ ] **2.2 Deterministic 4-Step Library Sync Use Case (`internal/usecase/sync_library.go`):**
+- [x] **2.2 Deterministic 4-Step Library Sync Use Case (`internal/usecase/sync_library.go`):**
   - Define narrow consumer interfaces (`SyncPhotoStore`, `MediaScanner`, `PreviewExtractor`) inside `internal/usecase`, accept them in `NewSyncLibraryUseCase(...)`, and return the concrete `*SyncLibraryUseCase` struct.
   - Abort sync immediately if `LIBRARY_PATH` is unreadable or empty (`0` media files when the DB has active records) to protect against unmounted drives.
   - Reconcile in-place edits (same `relative_path`, new `SHA-256` -> update hash & preview in place while keeping `view_count`), moved/renamed files (two-step `relative_path` update), exact duplicates (attach second `photo_files` row to existing `Photo`), and reactivated `missing` files.
   - Group **`RAW + JPEG` still-photo pairs** (`media_type == 'photo'`, matching folder + lowercase base filename, never merging video with photo) under a single logical `Photo` (`stack_key`) with `CR3` as the default priority variant.
   - Mark remaining unseen `photo_files` rows as `status = 'missing'` and provide a `PurgeMissing` use case that backs up the DB first.
-- [ ] **2.3 Preview, Thumbnail & Format-Aware EXIF Pipeline (`internal/adapter/media`):**
+- [x] **2.3 Preview, Thumbnail & Format-Aware EXIF Pipeline (`internal/adapter/media`):**
   - Invoke external media tools (`exiftool`, `ffmpeg`, `libheif`) strictly via `exec.CommandContext` (never via `sh -c`) with a strict per-file timeout (`15s`) and atomic `.tmp` → rename cache writes.
   - Generate and cache `400px` JPEG grid thumbnails (`<CACHE_PATH>/<sha256>_thumb.jpg`) and `2560px` high-res web previews (`<CACHE_PATH>/<sha256>_preview.jpg`), applying EXIF `Orientation (1..8)` rotation for `.CR3`/RAW and `.JPG` while relying on `libheif` container rotation for `.HEIC` (preventing double-rotation).
   - Extract video poster frames and duration for `.MP4`, `.MOV`, `.MKV`, `.WebM`.

@@ -30,17 +30,8 @@ type (
 	rowQueryFunc  func(ctx context.Context, query string, args ...any) *sql.Row
 )
 
-// FileMove describes a target relative path update for an existing PhotoFile.
-type FileMove struct {
-	// FileID is the unique identifier of the PhotoFile to move.
-	FileID string
-	// RelativePath is the destination path relative to the library root.
-	RelativePath string
-	// FileName is the destination base filename including extension.
-	FileName string
-	// FolderPath is the destination folder path relative to the library root.
-	FolderPath string
-}
+// FileMove aliases domain.FileMove for repository move batches.
+type FileMove = domain.FileMove
 
 // PhotoRepository persists and queries logical Photo aggregates, physical
 // PhotoFile records, emoji tags, and library-wide statistics in SQLite.

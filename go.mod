@@ -3,6 +3,7 @@ module github.com/lucastheo/photos
 go 1.26.0
 
 require (
+	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.44.0
 	modernc.org/sqlite v1.62.0
 )

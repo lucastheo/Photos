@@ -21,6 +21,18 @@ func (s SyncStatus) IsValid() bool {
 	return s == SyncStatusRunning || s == SyncStatusCompleted || s == SyncStatusFailed
 }
 
+// FileMove describes a target relative path update for an existing PhotoFile.
+type FileMove struct {
+	// FileID is the unique identifier of the PhotoFile to move.
+	FileID string
+	// RelativePath is the destination path relative to the library root.
+	RelativePath string
+	// FileName is the destination base filename including extension.
+	FileName string
+	// FolderPath is the destination folder path relative to the library root.
+	FolderPath string
+}
+
 // ScannedFile represents metadata discovered on disk for a media file during sync.
 type ScannedFile struct {
 	// RelativePath is the NFC-normalized path relative to the library root.

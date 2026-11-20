@@ -116,6 +116,20 @@ type EXIFMetadata struct {
 	GPSLongitude *float64
 }
 
+// MediaMetadata holds dimensions, playback duration, capture timestamp, and EXIF metadata extracted from a media file.
+type MediaMetadata struct {
+	// Width is the post-orientation display width in pixels.
+	Width int
+	// Height is the post-orientation display height in pixels.
+	Height int
+	// DurationSec is the playback duration in seconds for videos.
+	DurationSec float64
+	// TakenAt is the capture timestamp from EXIF or container metadata.
+	TakenAt *time.Time
+	// EXIF contains parsed camera, exposure, orientation, and GPS metadata.
+	EXIF EXIFMetadata
+}
+
 // PhotoFile represents a single physical file path on disk linked to a logical Photo.
 type PhotoFile struct {
 	// ID is the unique identifier for this physical file record.
