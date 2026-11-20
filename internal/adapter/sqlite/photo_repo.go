@@ -115,6 +115,9 @@ func (r *PhotoRepository) UpdateFileInPlace(ctx context.Context, file domain.Pho
 	if status == "" {
 		status = domain.FileStatusActive
 	}
+	if !status.IsValid() {
+		return fmt.Errorf("invalid file status %q", status)
+	}
 	updatedAt := file.UpdatedAt
 	if updatedAt.IsZero() {
 		updatedAt = time.Now().UTC()
@@ -128,16 +131,8 @@ func (r *PhotoRepository) UpdateFileInPlace(ctx context.Context, file domain.Pho
 	if err != nil {
 		return errors.Join(err, tx.Rollback())
 	}
-	if status == domain.FileStatusActive {
-		if _, err := tx.ExecContext(
-			ctx,
-			`UPDATE photos SET status = ?, updated_at_unix = ? WHERE id = ?`,
-			string(domain.FileStatusActive),
-			timeToUnix(updatedAt),
-			photoID,
-		); err != nil {
-			return errors.Join(fmt.Errorf("reactivate photo after in-place update: %w", err), tx.Rollback())
-		}
+	if err := recomputePhotoStatusChunksTx(ctx, tx, []string{photoID}, timeToUnix(updatedAt)); err != nil {
+		return errors.Join(err, tx.Rollback())
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit update file tx: %w", err)
@@ -209,21 +204,32 @@ func (r *PhotoRepository) MarkFilesMissing(ctx context.Context, fileIDs []string
 
 // GetByID retrieves a logical Photo by ID with hydrated Files, Formats, and EmojiTags.
 func (r *PhotoRepository) GetByID(ctx context.Context, photoID string) (domain.Photo, error) {
-	return loadHydratedPhotoByID(ctx, r.db.QueryRowContext, r.db.QueryContext, photoID)
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return domain.Photo{}, fmt.Errorf("begin get photo tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	return loadHydratedPhotoByID(ctx, tx.QueryRowContext, tx.QueryContext, photoID)
 }
 
 // GetByStackKey retrieves a logical Photo matching stackKey, preferring active records.
 func (r *PhotoRepository) GetByStackKey(ctx context.Context, stackKey string) (domain.Photo, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return domain.Photo{}, fmt.Errorf("begin get photo by stack key tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	query := `SELECT ` + photoSelectCols + `
 		FROM photos p
 		WHERE p.stack_key = ?
 		ORDER BY CASE WHEN p.status = 'active' THEN 0 ELSE 1 END, p.created_at_unix ASC
 		LIMIT 1`
-	entity, err := scanSinglePhoto(r.db.QueryRowContext(ctx, query, stackKey))
+	entity, err := scanSinglePhoto(tx.QueryRowContext(ctx, query, stackKey))
 	if err != nil {
 		return domain.Photo{}, err
 	}
-	hydrated, err := hydratePhotos(ctx, r.db.QueryContext, []photoEntity{entity})
+	hydrated, err := hydratePhotos(ctx, tx.QueryContext, []photoEntity{entity})
 	if err != nil {
 		return domain.Photo{}, err
 	}
@@ -354,7 +360,7 @@ func insertPhotoTagsTx(ctx context.Context, tx *sql.Tx, photoID string, tags []s
 		e := photoTagToEntity(photoID, emoji, now)
 		if _, err := tx.ExecContext(
 			ctx,
-			`INSERT OR IGNORE INTO photo_tags (photo_id, emoji, created_at_unix) VALUES (?, ?, ?)`,
+			`INSERT INTO photo_tags (photo_id, emoji, created_at_unix) VALUES (?, ?, ?) ON CONFLICT(photo_id, emoji) DO NOTHING`,
 			e.PhotoID, e.Emoji, e.CreatedAtUnix,
 		); err != nil {
 			return fmt.Errorf("insert photo_tag %q: %w", e.Emoji, err)
@@ -416,15 +422,21 @@ func normalizeFileMoves(moves []FileMove) ([]FileMove, error) {
 		if strings.TrimSpace(m.FileID) == "" || relPath == "" {
 			return nil, fmt.Errorf("invalid file move (id=%q, relative_path=%q)", m.FileID, m.RelativePath)
 		}
-		fileName := m.FileName
+		fileName := domain.NormalizeNFC(m.FileName)
 		if fileName == "" {
 			fileName = path.Base(relPath)
+		}
+		folderPath := domain.NormalizeRelativePath(m.FolderPath)
+		if strings.TrimSpace(m.FolderPath) == "" {
+			if dir := path.Dir(relPath); dir != "." {
+				folderPath = dir
+			}
 		}
 		out = append(out, FileMove{
 			FileID:       m.FileID,
 			RelativePath: relPath,
 			FileName:     fileName,
-			FolderPath:   domain.NormalizeRelativePath(m.FolderPath),
+			FolderPath:   folderPath,
 		})
 	}
 	return out, nil
@@ -551,10 +563,24 @@ func computeMovedParentAttrs(
 		return curFolder, curBaseName, curStackKey
 	}
 	commonFolder := activeFiles[0].folderPath
-	for _, f := range activeFiles[1:] {
+	allSameFolder, curFolderActive := true, false
+	best := activeFiles[0]
+	for _, f := range activeFiles {
 		if f.folderPath != commonFolder {
+			allSameFolder = false
+		}
+		if f.folderPath == curFolder {
+			curFolderActive = true
+		}
+		if domain.FormatPriority(f.format) > domain.FormatPriority(best.format) {
+			best = f
+		}
+	}
+	if !allSameFolder {
+		if curFolderActive {
 			return curFolder, curBaseName, curStackKey
 		}
+		return best.folderPath, curBaseName, domain.ComputeStackKey(best.folderPath, mediaType, curBaseName, best.format)
 	}
 
 	newBaseName, primaryFmt := resolveUnambiguousStemAndFormat(curBaseName, activeFiles)

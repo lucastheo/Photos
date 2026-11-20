@@ -3,8 +3,10 @@ package sqlite_test
 import (
 	"context"
 	"errors"
+	"math"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -397,6 +399,46 @@ func TestPhotoRepository_Integration_TagsAndSearch(t *testing.T) {
 	if _, err := repo.Search(ctx, domain.PhotoFilter{SortBy: "invalid"}); !errors.Is(err, domain.ErrInvalidFilter) {
 		t.Fatalf("invalid filter err = %v, want ErrInvalidFilter", err)
 	}
+
+	// Extreme page numbers must never overflow int offset and wrap to Page 1.
+	for _, bigPage := range []int{math.MaxInt, math.MaxInt/50 + 2} {
+		pastEnd, err := repo.Search(ctx, domain.PhotoFilter{Page: bigPage, PageSize: 50})
+		if err != nil {
+			t.Fatalf("Search(page=%d) failed: %v", bigPage, err)
+		}
+		if pastEnd.Total != 3 || len(pastEnd.Items) != 0 {
+			t.Fatalf("Search(page=%d) = (total=%d, len=%d), want (3, 0)", bigPage, pastEnd.Total, len(pastEnd.Items))
+		}
+	}
+
+	// Case-sensitive folder prefix range: "2025/SUB" must not match "2025/sub".
+	upperFolder, err := repo.Search(ctx, domain.PhotoFilter{Folder: "2025/SUB"})
+	if err != nil || upperFolder.Total != 0 {
+		t.Fatalf("Search(Folder=2025/SUB) = (%d, %v), want 0", upperFolder.Total, err)
+	}
+
+	// Verify folder range predicate can use idx_photos_folder (rather than LIKE full-scan).
+	planRows, err := db.SQL().QueryContext(
+		ctx,
+		`EXPLAIN QUERY PLAN SELECT id FROM photos p WHERE p.folder_path = ? OR (p.folder_path >= ? AND p.folder_path < ?)`,
+		"2025", "2025/", "20250",
+	)
+	if err != nil {
+		t.Fatalf("EXPLAIN QUERY PLAN failed: %v", err)
+	}
+	defer func() { _ = planRows.Close() }()
+	var plans []string
+	for planRows.Next() {
+		var id, parent, notused int
+		var detail string
+		if err := planRows.Scan(&id, &parent, &notused, &detail); err != nil {
+			t.Fatalf("scan query plan failed: %v", err)
+		}
+		plans = append(plans, detail)
+	}
+	if !strings.Contains(strings.Join(plans, "\n"), "idx_photos_folder") {
+		t.Fatalf("expected idx_photos_folder in query plan, got: %v", plans)
+	}
 }
 
 func TestPhotoRepository_Integration_GetLibraryStats(t *testing.T) {
@@ -508,7 +550,10 @@ func TestPhotoRepository_Integration_EdgeAndErrorBranches(t *testing.T) {
 		t.Fatal("expected error for empty FileID in MoveFilesBatch")
 	}
 
-	// Mark both missing, then reactivate via UpdateFileInPlace by ID.
+	// Mark both missing, then reactivate via UpdateFileInPlace by ID; test invalid & missing transitions.
+	if err := repo.UpdateFileInPlace(ctx, domain.PhotoFile{ID: "f-cr3", Status: "bogus"}); err == nil {
+		t.Fatal("expected error for invalid FileStatus in UpdateFileInPlace")
+	}
 	if err := repo.MarkFilesMissing(ctx, []string{"f-cr3", "f-jpg", "f-cr3"}, now); err != nil {
 		t.Fatalf("MarkFilesMissing failed: %v", err)
 	}
@@ -524,11 +569,17 @@ func TestPhotoRepository_Integration_EdgeAndErrorBranches(t *testing.T) {
 	if reactivated.Status != domain.FileStatusActive {
 		t.Fatalf("expected active status after UpdateFileInPlace, got %q", reactivated.Status)
 	}
-
-	// Move stacked pair together with auto-derived FileName & zero time; also verify AttachFile reactivation.
-	if err := repo.MarkFilesMissing(ctx, []string{"f-cr3"}, now); err != nil {
-		t.Fatalf("MarkFilesMissing f-cr3 failed: %v", err)
+	if err := repo.UpdateFileInPlace(ctx, domain.PhotoFile{
+		ID: "f-cr3", ContentHash: "h1-new", FileSize: 120, ModTime: now, Status: domain.FileStatusMissing,
+	}); err != nil {
+		t.Fatalf("UpdateFileInPlace to missing failed: %v", err)
 	}
+	demoted, _ := repo.GetByID(ctx, "p-edge")
+	if demoted.Status != domain.FileStatusMissing {
+		t.Fatalf("expected missing parent status when sole active file updated to missing, got %q", demoted.Status)
+	}
+
+	// Move stacked/duplicate files: omitted FolderPath derives from RelativePath, NFD FileName normalizes, and parent leaves inactive folder.
 	if err := repo.AttachFile(ctx, "p-edge", domain.PhotoFile{
 		ID: "f-dup", ContentHash: "h1-new", RelativePath: "Backup/IMG_1.CR3",
 		FileName: "IMG_1.CR3", FolderPath: "Backup", Format: domain.FormatCR3, FileSize: 120, ModTime: now,
@@ -536,9 +587,22 @@ func TestPhotoRepository_Integration_EdgeAndErrorBranches(t *testing.T) {
 		t.Fatalf("AttachFile reactivation failed: %v", err)
 	}
 	if err := repo.MoveFilesBatch(ctx, []sqlite.FileMove{
-		{FileID: "f-cr3", RelativePath: "Trip2/REN_1.CR3", FolderPath: "Trip2"},
+		{FileID: "f-cr3", RelativePath: "Trip2/REN_1.CR3", FileName: "Cafe\u0301_1.CR3"},
 	}, time.Time{}); err != nil {
 		t.Fatalf("MoveFilesBatch cross-folder dup failed: %v", err)
+	}
+	movedParent, _ := repo.GetByID(ctx, "p-edge")
+	if movedParent.FolderPath == "Trip" {
+		t.Fatalf("expected parent FolderPath to move off inactive Trip folder, got %q", movedParent.FolderPath)
+	}
+	var movedFile domain.PhotoFile
+	for _, f := range movedParent.Files {
+		if f.ID == "f-cr3" {
+			movedFile = f
+		}
+	}
+	if movedFile.FolderPath != "Trip2" || movedFile.FileName != "Café_1.CR3" {
+		t.Fatalf("expected derived FolderPath=Trip2 and NFC FileName=Café_1.CR3, got %+v", movedFile)
 	}
 
 	// RemoveTag error cases.

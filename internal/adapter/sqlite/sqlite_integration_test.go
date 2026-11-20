@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,6 +136,45 @@ func TestDB_Integration_CheckpointAndBackup(t *testing.T) {
 	gotVal, err := sqlite.NewSyncRepository(backupDB.SQL()).GetSetting(ctx, "session_secret")
 	if err != nil || gotVal != "super-secret" {
 		t.Fatalf("backup setting = (%q, %v), want (super-secret, nil)", gotVal, err)
+	}
+
+	// Blocked WAL checkpoint (active reader holding older snapshot while newer WAL frame exists) must error.
+	shortDB, err := sqlite.Open(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("open shortDB failed: %v", err)
+	}
+	defer func() { _ = shortDB.Close() }()
+	shortDB.SQL().SetMaxOpenConns(1)
+	if _, err := shortDB.SQL().ExecContext(ctx, `PRAGMA busy_timeout = 50`); err != nil {
+		t.Fatalf("set short busy_timeout failed: %v", err)
+	}
+
+	readTx, err := db.SQL().BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		t.Fatalf("begin read snapshot failed: %v", err)
+	}
+	var dummy string
+	if err := readTx.QueryRowContext(ctx, `SELECT value FROM app_settings WHERE key = 'session_secret'`).Scan(&dummy); err != nil {
+		_ = readTx.Rollback()
+		t.Fatalf("read snapshot query failed: %v", err)
+	}
+	if err := sqlite.NewSyncRepository(shortDB.SQL()).SetSetting(ctx, "wal_block", "1", time.Now()); err != nil {
+		_ = readTx.Rollback()
+		t.Fatalf("write newer WAL frame failed: %v", err)
+	}
+	if err := shortDB.Checkpoint(ctx); err == nil {
+		_ = readTx.Rollback()
+		t.Fatal("expected Checkpoint error when WAL reader blocks truncation")
+	}
+	if _, err := shortDB.Backup(ctx, "blocked"); err == nil {
+		_ = readTx.Rollback()
+		t.Fatal("expected Backup error when Checkpoint is blocked")
+	}
+	if err := readTx.Rollback(); err != nil {
+		t.Fatalf("rollback read snapshot failed: %v", err)
+	}
+	if err := shortDB.Checkpoint(ctx); err != nil {
+		t.Fatalf("Checkpoint after releasing reader failed: %v", err)
 	}
 }
 

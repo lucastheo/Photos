@@ -39,7 +39,7 @@ lint-max-file:
 
 lint:
 	golangci-lint run
-	@diff_out="$$(golangci-lint fmt --diff)"; \
+	@diff_out="$$(golangci-lint fmt --diff)" || exit 1; \
 	if [ -n "$$diff_out" ]; then \
 		printf '%s\n' "$$diff_out"; \
 		echo "FAIL: gofumpt formatting differences found. Run 'golangci-lint fmt'." >&2; \

@@ -94,8 +94,16 @@ func (d *DB) Close() error {
 
 // Checkpoint flushes WAL frames into the main database file and truncates the WAL.
 func (d *DB) Checkpoint(ctx context.Context) error {
-	if _, err := d.sqlDB.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+	var busy, logFrames, checkpointed int
+	err := d.sqlDB.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &checkpointed)
+	if err != nil {
 		return fmt.Errorf("sqlite wal checkpoint: %w", err)
+	}
+	if busy != 0 || (logFrames > 0 && checkpointed < logFrames) {
+		return fmt.Errorf(
+			"sqlite wal checkpoint incomplete (busy=%d, log=%d, checkpointed=%d)",
+			busy, logFrames, checkpointed,
+		)
 	}
 	return nil
 }

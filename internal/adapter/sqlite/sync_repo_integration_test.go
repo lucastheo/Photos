@@ -108,9 +108,26 @@ func TestSyncRepository_Integration_Settings(t *testing.T) {
 		t.Fatalf("GetSetting = (%q, %v), want (rotated-secret, nil)", got, err)
 	}
 
-	// Default StartedAt/Status, custom RecoverStaleRuns reason, and closed-DB errors.
-	if err := repo.CreateSyncRun(ctx, domain.SyncReport{ID: "run-defaults"}); err != nil {
+	// Default StartedAt/Status, UpdateSyncRun preserves started_at_unix, custom RecoverStaleRuns reason, and closed-DB errors.
+	if err := repo.CreateSyncRun(ctx, domain.SyncReport{ID: "run-earlier", StartedAt: now.Add(-time.Minute), Status: domain.SyncStatusCompleted}); err != nil {
+		t.Fatalf("CreateSyncRun earlier failed: %v", err)
+	}
+	defaultRun := domain.SyncReport{ID: "run-defaults"}
+	if err := repo.CreateSyncRun(ctx, defaultRun); err != nil {
 		t.Fatalf("CreateSyncRun defaults failed: %v", err)
+	}
+	// Update using the original zero-StartedAt struct; stored started_at_unix must not be zeroed out.
+	defaultRun.Status = domain.SyncStatusCompleted
+	defaultRun.ScannedCount = 7
+	if err := repo.UpdateSyncRun(ctx, defaultRun); err != nil {
+		t.Fatalf("UpdateSyncRun zero-StartedAt failed: %v", err)
+	}
+	latestAfterZeroUpdate, err := repo.GetLatestSyncRun(ctx)
+	if err != nil || latestAfterZeroUpdate.ID != "run-defaults" || latestAfterZeroUpdate.StartedAt.IsZero() {
+		t.Fatalf("expected run-defaults with preserved StartedAt as latest, got (%+v, %v)", latestAfterZeroUpdate, err)
+	}
+	if err := repo.CreateSyncRun(ctx, domain.SyncReport{ID: "run-stale"}); err != nil {
+		t.Fatalf("CreateSyncRun stale failed: %v", err)
 	}
 	if err := repo.SetSetting(ctx, "zero_time", "ok", time.Time{}); err != nil {
 		t.Fatalf("SetSetting zero time failed: %v", err)
@@ -120,7 +137,7 @@ func TestSyncRepository_Integration_Settings(t *testing.T) {
 		t.Fatalf("RecoverStaleRuns = (%d, %v), want 1", recovered, err)
 	}
 	runs, err := repo.ListSyncRuns(ctx, 1)
-	if err != nil || len(runs) != 1 || runs[0].ErrorMessage != "manual abort" {
+	if err != nil || len(runs) != 1 || runs[0].ID != "run-stale" || runs[0].ErrorMessage != "manual abort" {
 		t.Fatalf("ListSyncRuns(1) = (%+v, %v)", runs, err)
 	}
 

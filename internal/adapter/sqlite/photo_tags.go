@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,19 +15,27 @@ func (r *PhotoRepository) AddTag(ctx context.Context, photoID, rawEmoji string, 
 	if err != nil {
 		return err
 	}
-	if err := ensurePhotoExists(ctx, r.db.QueryRowContext, photoID); err != nil {
-		return err
-	}
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin add tag tx: %w", err)
+	}
+	if err := ensurePhotoExists(ctx, tx.QueryRowContext, photoID); err != nil {
+		return errors.Join(err, tx.Rollback())
+	}
 	e := photoTagToEntity(photoID, emoji, now)
-	if _, err := r.db.ExecContext(
+	if _, err := tx.ExecContext(
 		ctx,
-		`INSERT OR IGNORE INTO photo_tags (photo_id, emoji, created_at_unix) VALUES (?, ?, ?)`,
+		`INSERT INTO photo_tags (photo_id, emoji, created_at_unix) VALUES (?, ?, ?) ON CONFLICT(photo_id, emoji) DO NOTHING`,
 		e.PhotoID, e.Emoji, e.CreatedAtUnix,
 	); err != nil {
-		return fmt.Errorf("add tag %q to photo %q: %w", e.Emoji, e.PhotoID, err)
+		return errors.Join(fmt.Errorf("add tag %q to photo %q: %w", e.Emoji, e.PhotoID, err), tx.Rollback())
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit add tag tx: %w", err)
 	}
 	return nil
 }

@@ -104,7 +104,7 @@ func TestPhotoEntityMapping(t *testing.T) {
 		in := domain.Photo{
 			ID:          "p1",
 			StackKey:    "2025/Trip/photo/img_1",
-			BaseName:    "IMG_1",
+			BaseName:    "Cafe\u0301_1",
 			FolderPath:  "/2025/Trip/",
 			MediaType:   domain.MediaTypePhoto,
 			Width:       6000,
@@ -131,7 +131,7 @@ func TestPhotoEntityMapping(t *testing.T) {
 		}
 
 		entity := photoToEntity(in)
-		if entity.FolderPath != "2025/Trip" || entity.Orientation != 6 || !entity.ISO.Valid || entity.ISO.Int64 != 400 {
+		if entity.BaseName != "Café_1" || entity.FolderPath != "2025/Trip" || entity.Orientation != 6 || !entity.ISO.Valid || entity.ISO.Int64 != 400 {
 			t.Fatalf("unexpected photoEntity: %+v", entity)
 		}
 
@@ -196,8 +196,8 @@ func TestPhotoFileEntityMapping(t *testing.T) {
 			ID:           "f1",
 			PhotoID:      "p1",
 			ContentHash:  "abc123",
-			RelativePath: "/Cafe\u0301/IMG.JPG",
-			FileName:     "IMG.JPG",
+			RelativePath: "/Cafe\u0301/Cafe\u0301.JPG",
+			FileName:     "Cafe\u0301.JPG",
 			FolderPath:   `\Cafe` + "\u0301" + `\`,
 			Format:       domain.FormatJPG,
 			FileSize:     4096,
@@ -207,11 +207,11 @@ func TestPhotoFileEntityMapping(t *testing.T) {
 			UpdatedAt:    created,
 		}
 		e := photoFileToEntity(in)
-		if e.RelativePath != "Café/IMG.JPG" || e.FolderPath != "Café" {
-			t.Fatalf("expected NFC normalized paths, got rel=%q folder=%q", e.RelativePath, e.FolderPath)
+		if e.RelativePath != "Café/Café.JPG" || e.FileName != "Café.JPG" || e.FolderPath != "Café" {
+			t.Fatalf("expected NFC normalized paths, got rel=%q file=%q folder=%q", e.RelativePath, e.FileName, e.FolderPath)
 		}
 		got := photoFileFromEntity(e)
-		if got.RelativePath != "Café/IMG.JPG" || got.Status != domain.FileStatusMissing || !got.ModTime.Equal(modTime) {
+		if got.RelativePath != "Café/Café.JPG" || got.Status != domain.FileStatusMissing || !got.ModTime.Equal(modTime) {
 			t.Fatalf("unexpected mapped PhotoFile: %+v", got)
 		}
 	})
@@ -405,11 +405,19 @@ func TestPhotoHelperBranches(t *testing.T) {
 	}
 
 	f2, b2, sk2 := computeMovedParentAttrs(domain.MediaTypePhoto, "orig", "origDir", "origDir/photo/orig", []activeFileMeta{
-		{folderPath: "a", fileName: "A.jpg", format: domain.FormatJPG},
+		{folderPath: "origDir", fileName: "A.jpg", format: domain.FormatJPG},
 		{folderPath: "b", fileName: "A.jpg", format: domain.FormatJPG},
 	})
 	if f2 != "origDir" || b2 != "orig" || sk2 != "origDir/photo/orig" {
-		t.Fatalf("cross-folder duplicates mutated parent attrs: %q %q %q", f2, b2, sk2)
+		t.Fatalf("cross-folder duplicates mutated parent attrs while curFolder remained active: %q %q %q", f2, b2, sk2)
+	}
+
+	f2b, b2b, sk2b := computeMovedParentAttrs(domain.MediaTypePhoto, "orig", "origDir", "origDir/photo/orig", []activeFileMeta{
+		{folderPath: "a", fileName: "A.jpg", format: domain.FormatJPG},
+		{folderPath: "b", fileName: "A.CR3", format: domain.FormatCR3},
+	})
+	if f2b != "b" || b2b != "orig" || sk2b != "b/photo/orig" {
+		t.Fatalf("cross-folder duplicates after curFolder left = (%q, %q, %q), want (b, orig, b/photo/orig)", f2b, b2b, sk2b)
 	}
 
 	f3, b3, sk3 := computeMovedParentAttrs(domain.MediaTypePhoto, "orig", "origDir", "origDir/photo/orig", []activeFileMeta{

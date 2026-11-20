@@ -57,11 +57,11 @@ func (r *SyncRepository) UpdateSyncRun(ctx context.Context, report domain.SyncRe
 	e := syncReportToEntity(report)
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE sync_runs
-		SET started_at_unix = ?, finished_at_unix = ?, status = ?,
+		SET finished_at_unix = ?, status = ?,
 			scanned_count = ?, added_count = ?, updated_count = ?, moved_count = ?,
 			stacked_count = ?, duplicate_count = ?, unchanged_count = ?, missing_count = ?, error_message = ?
 		WHERE id = ?`,
-		e.StartedAtUnix, e.FinishedAtUnix, e.Status,
+		e.FinishedAtUnix, e.Status,
 		e.ScannedCount, e.AddedCount, e.UpdatedCount, e.MovedCount,
 		e.StackedCount, e.DuplicateCount, e.UnchangedCount, e.MissingCount, e.ErrorMessage,
 		e.ID,

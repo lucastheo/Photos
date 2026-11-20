@@ -3,6 +3,7 @@ package sqlite
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"slices"
@@ -64,6 +65,12 @@ func groupDuplicateFiles(files []domain.PhotoFile) []domain.DuplicateGroup {
 // ListMissing returns all logical Photo records that are marked missing or
 // still own at least one missing PhotoFile, bulk-hydrated with files and tags.
 func (r *PhotoRepository) ListMissing(ctx context.Context) ([]domain.Photo, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("begin list missing tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	missing := string(domain.FileStatusMissing)
 	query := `SELECT ` + photoSelectCols + `
 		FROM photos p
@@ -71,7 +78,7 @@ func (r *PhotoRepository) ListMissing(ctx context.Context) ([]domain.Photo, erro
 		   OR EXISTS (SELECT 1 FROM photo_files pf WHERE pf.photo_id = p.id AND pf.status = ?)
 		ORDER BY p.folder_path ASC, p.base_name ASC, p.id ASC`
 
-	rows, err := r.db.QueryContext(ctx, query, missing, missing)
+	rows, err := tx.QueryContext(ctx, query, missing, missing)
 	if err != nil {
 		return nil, fmt.Errorf("query missing photos: %w", err)
 	}
@@ -79,7 +86,7 @@ func (r *PhotoRepository) ListMissing(ctx context.Context) ([]domain.Photo, erro
 	if err != nil {
 		return nil, err
 	}
-	return hydratePhotos(ctx, r.db.QueryContext, entities)
+	return hydratePhotos(ctx, tx.QueryContext, entities)
 }
 
 // PurgeMissing transactionally deletes all missing PhotoFile rows and any
@@ -123,18 +130,24 @@ func (r *PhotoRepository) PurgeMissing(ctx context.Context) (int64, error) {
 // GetLibraryStats computes aggregate counts, duplicate totals, missing counts,
 // and breakdowns by format and folder for the indexed media library.
 func (r *PhotoRepository) GetLibraryStats(ctx context.Context) (domain.LibraryStats, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return domain.LibraryStats{}, fmt.Errorf("begin library stats tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var stats domain.LibraryStats
-	if err := r.loadPhotoViewAggregates(ctx, &stats); err != nil {
+	if err := loadPhotoViewAggregates(ctx, tx.QueryRowContext, &stats); err != nil {
 		return domain.LibraryStats{}, err
 	}
-	if err := r.loadFileAndDuplicateAggregates(ctx, &stats); err != nil {
+	if err := loadFileAndDuplicateAggregates(ctx, tx.QueryRowContext, &stats); err != nil {
 		return domain.LibraryStats{}, err
 	}
-	byFormat, err := r.loadFormatStats(ctx)
+	byFormat, err := loadFormatStats(ctx, tx.QueryContext)
 	if err != nil {
 		return domain.LibraryStats{}, err
 	}
-	byFolder, err := r.loadFolderStats(ctx)
+	byFolder, err := loadFolderStats(ctx, tx.QueryContext)
 	if err != nil {
 		return domain.LibraryStats{}, err
 	}
@@ -143,10 +156,10 @@ func (r *PhotoRepository) GetLibraryStats(ctx context.Context) (domain.LibrarySt
 	return stats, nil
 }
 
-func (r *PhotoRepository) loadPhotoViewAggregates(ctx context.Context, stats *domain.LibraryStats) error {
+func loadPhotoViewAggregates(ctx context.Context, queryRow rowQueryFunc, stats *domain.LibraryStats) error {
 	active := string(domain.FileStatusActive)
 	missing := string(domain.FileStatusMissing)
-	err := r.db.QueryRowContext(ctx, `
+	err := queryRow(ctx, `
 		SELECT
 			COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN status = ? AND view_count = 0 THEN 1 ELSE 0 END), 0),
@@ -168,10 +181,10 @@ func (r *PhotoRepository) loadPhotoViewAggregates(ctx context.Context, stats *do
 	return nil
 }
 
-func (r *PhotoRepository) loadFileAndDuplicateAggregates(ctx context.Context, stats *domain.LibraryStats) error {
+func loadFileAndDuplicateAggregates(ctx context.Context, queryRow rowQueryFunc, stats *domain.LibraryStats) error {
 	active := string(domain.FileStatusActive)
 	missing := string(domain.FileStatusMissing)
-	err := r.db.QueryRowContext(ctx, `
+	err := queryRow(ctx, `
 		SELECT
 			COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0)
@@ -182,7 +195,7 @@ func (r *PhotoRepository) loadFileAndDuplicateAggregates(ctx context.Context, st
 		return fmt.Errorf("query file counts: %w", err)
 	}
 
-	err = r.db.QueryRowContext(ctx, `
+	err = queryRow(ctx, `
 		SELECT COUNT(*), COALESCE(SUM(cnt), 0)
 		FROM (
 			SELECT COUNT(*) AS cnt
@@ -199,8 +212,8 @@ func (r *PhotoRepository) loadFileAndDuplicateAggregates(ctx context.Context, st
 	return nil
 }
 
-func (r *PhotoRepository) loadFormatStats(ctx context.Context) ([]domain.FormatStat, error) {
-	rows, err := r.db.QueryContext(ctx, `
+func loadFormatStats(ctx context.Context, queryRows rowsQueryFunc) ([]domain.FormatStat, error) {
+	rows, err := queryRows(ctx, `
 		SELECT format, COUNT(*) AS cnt
 		FROM photo_files
 		WHERE status = ?
@@ -231,8 +244,8 @@ func (r *PhotoRepository) loadFormatStats(ctx context.Context) ([]domain.FormatS
 	return out, nil
 }
 
-func (r *PhotoRepository) loadFolderStats(ctx context.Context) ([]domain.FolderStat, error) {
-	rows, err := r.db.QueryContext(ctx, `
+func loadFolderStats(ctx context.Context, queryRows rowsQueryFunc) ([]domain.FolderStat, error) {
+	rows, err := queryRows(ctx, `
 		SELECT folder_path, COUNT(*) AS cnt
 		FROM photos
 		WHERE status = ?

@@ -407,4 +407,7 @@ func TestPhotoStructsInstantiation(t *testing.T) {
 	if p.EXIF.CameraMake != "Canon" || len(p.Files) != 1 {
 		t.Fatalf("unexpected photo struct: %+v", p)
 	}
+	if got := domain.NormalizeNFC("Cafe\u0301"); got != "Café" {
+		t.Fatalf("NormalizeNFC = %q, want Café", got)
+	}
 }

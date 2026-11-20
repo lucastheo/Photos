@@ -316,6 +316,11 @@ func PrimaryFile(files []PhotoFile) (PhotoFile, bool) {
 	return sorted[0], true
 }
 
+// NormalizeNFC returns s converted to Unicode Normalization Form C (NFC).
+func NormalizeNFC(s string) string {
+	return norm.NFC.String(s)
+}
+
 // NormalizeRelativePath converts a path to NFC Unicode normalization, replaces
 // backslashes with forward slashes, trims leading slashes, and cleans it.
 func NormalizeRelativePath(p string) string {

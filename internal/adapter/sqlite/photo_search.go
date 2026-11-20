@@ -22,22 +22,28 @@ func (r *PhotoRepository) Search(ctx context.Context, filter domain.PhotoFilter)
 		return domain.PaginatedPhotos{}, err
 	}
 
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return domain.PaginatedPhotos{}, fmt.Errorf("begin search photos tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	whereClause, whereArgs := buildSearchWhere(norm)
 	var total int64
 	countSQL := `SELECT COUNT(*) FROM photos p WHERE ` + whereClause
-	if err := r.db.QueryRowContext(ctx, countSQL, whereArgs...).Scan(&total); err != nil {
+	if err := tx.QueryRowContext(ctx, countSQL, whereArgs...).Scan(&total); err != nil {
 		return domain.PaginatedPhotos{}, fmt.Errorf("count search photos: %w", err)
 	}
-	if total == 0 {
+	if total == 0 || int64(norm.Page-1) > (total-1)/int64(norm.PageSize) {
 		return domain.PaginatedPhotos{
 			Items:    []domain.Photo{},
-			Total:    0,
+			Total:    total,
 			Page:     norm.Page,
 			PageSize: norm.PageSize,
 		}, nil
 	}
 
-	items, err := r.fetchSearchPage(ctx, norm, whereClause, whereArgs)
+	items, err := fetchSearchPage(ctx, tx.QueryContext, norm, whereClause, whereArgs)
 	if err != nil {
 		return domain.PaginatedPhotos{}, err
 	}
@@ -49,14 +55,15 @@ func (r *PhotoRepository) Search(ctx context.Context, filter domain.PhotoFilter)
 	}, nil
 }
 
-func (r *PhotoRepository) fetchSearchPage(
+func fetchSearchPage(
 	ctx context.Context,
+	queryRows rowsQueryFunc,
 	norm domain.PhotoFilter,
 	whereClause string,
 	whereArgs []any,
 ) ([]domain.Photo, error) {
 	orderClause, orderArgs := buildSearchOrder(norm)
-	offset := (norm.Page - 1) * norm.PageSize
+	offset := int64(norm.Page-1) * int64(norm.PageSize)
 
 	query := `SELECT ` + photoSelectCols + ` FROM photos p WHERE ` + whereClause +
 		` ORDER BY ` + orderClause + ` LIMIT ? OFFSET ?`
@@ -65,7 +72,7 @@ func (r *PhotoRepository) fetchSearchPage(
 	args = append(args, orderArgs...)
 	args = append(args, norm.PageSize, offset)
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := queryRows(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query search photos: %w", err)
 	}
@@ -73,7 +80,7 @@ func (r *PhotoRepository) fetchSearchPage(
 	if err != nil {
 		return nil, err
 	}
-	return hydratePhotos(ctx, r.db.QueryContext, entities)
+	return hydratePhotos(ctx, queryRows, entities)
 }
 
 func scanPhotoEntities(rows *sql.Rows) ([]photoEntity, error) {
@@ -145,8 +152,8 @@ func appendTagAndMediaClauses(clauses *[]string, args *[]any, f domain.PhotoFilt
 
 func appendLocationAndDateClauses(clauses *[]string, args *[]any, f domain.PhotoFilter) {
 	if f.Folder != "" {
-		*clauses = append(*clauses, `(p.folder_path = ? OR p.folder_path LIKE ? ESCAPE '\')`)
-		*args = append(*args, f.Folder, likeEscaper.Replace(f.Folder)+`/%`)
+		*clauses = append(*clauses, `(p.folder_path = ? OR (p.folder_path >= ? AND p.folder_path < ?))`)
+		*args = append(*args, f.Folder, f.Folder+"/", f.Folder+"0")
 	}
 	if f.HasGPS != nil {
 		if *f.HasGPS {

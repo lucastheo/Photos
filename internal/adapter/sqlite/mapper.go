@@ -20,7 +20,7 @@ func photoToEntity(p domain.Photo) photoEntity {
 	return photoEntity{
 		ID:               p.ID,
 		StackKey:         p.StackKey,
-		BaseName:         p.BaseName,
+		BaseName:         domain.NormalizeNFC(p.BaseName),
 		FolderPath:       domain.NormalizeRelativePath(p.FolderPath),
 		MediaType:        string(p.MediaType),
 		Width:            p.Width,
@@ -91,7 +91,7 @@ func photoFileToEntity(f domain.PhotoFile) photoFileEntity {
 		PhotoID:       f.PhotoID,
 		ContentHash:   f.ContentHash,
 		RelativePath:  domain.NormalizeRelativePath(f.RelativePath),
-		FileName:      f.FileName,
+		FileName:      domain.NormalizeNFC(f.FileName),
 		FolderPath:    domain.NormalizeRelativePath(f.FolderPath),
 		Format:        string(f.Format),
 		FileSize:      f.FileSize,
