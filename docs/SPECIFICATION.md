@@ -673,6 +673,25 @@ Both backend and frontend enforce a hard **minimum coverage gate of `> 90.0%`**.
 
 ---
 
+### 9.6 Performance Testing & Benchmarks (`make test-perf`)
+
+Performance tests verify that the application remains fast and responsive on large personal photo libraries (10,000+ photos/videos) without exhausting CPU, memory, or SQLite lock budgets. `make test-perf` runs Go benchmarks and automated latency/scale assertions:
+
+1. **Go Backend Benchmarks (`go test -bench=. -benchmem ./internal/...`):**
+   - **SQLite Query & Index Latency (`internal/adapter/sqlite/*_bench_test.go`):**
+     - Seeds a 10,000-photo SQLite database in `t.TempDir()` (with `photo_files`, `photo_views`, and `photo_tags` rows) and benchmarks paginated `SearchPhotos` queries across filter combinations (`min_views`/`max_views`, `emoji_tags` `AND` filter, `untagged`, `formats`, `folder`, `has_gps`/bounding box, and `sort_by=random_seeded`).
+     - Verifies query plans hit composite indexes (`idx_photos_status_views`, `idx_photo_tags_emoji`, `idx_photos_gps`) and keeps `p95` query latency `< 25ms` on 10,000+ photos, alongside concurrent `TrackView` write throughput in `WAL` mode.
+   - **Incremental Sync & Hashing Throughput (`internal/usecase/*_bench_test.go`, `internal/adapter/media/*_bench_test.go`):**
+     - Benchmarks `SyncLibraryUseCase` fast-skip path over 10,000 unchanged files (`(relative_path, size, mtime)` match with 0 bytes re-hashed; target `< 500ms` metadata diff).
+     - Benchmarks streaming `SHA-256` hashing throughput and bounded worker pool (`SYNC_WORKERS` / `PREVIEW_WORKERS`) memory bounds.
+   - **HTTP API & Cached Media Serving (`internal/adapter/httpapi/*_bench_test.go`):**
+     - Benchmarks `GET /api/v1/photos` response latency and `GET /api/v1/photos/{id}/thumbnail` / `preview` serving (verifying `ETag`, `Cache-Control: immutable`, and `206 Partial Content` byte-range streaming) under concurrent HTTP requests.
+2. **Frontend & E2E Scale Performance (`e2e/` Playwright Performance Spec):**
+   - Boots the compiled Go binary against a seeded 1,000+ photo SQLite dataset and measures Gallery Grid initial render, filter update latency, infinite/paginated scroll responsiveness (`content-visibility: auto` + `loading="lazy"`), and `<dialog>` Lightbox open/navigation latency (`p95 < 100ms` UI transition).
+   - Asserts defined latency budgets so regressions fail `make test-perf` in CI.
+
+---
+
 ## 10. Software Engineering, Reliability, Security & Packaging Standards
 
 ### 10.1 Safe SQLite Migrations with Automatic Pre-Migration Backup

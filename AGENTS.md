@@ -54,5 +54,6 @@ Read this file and [docs/SPECIFICATION.md](file:///home/theo/Projects/Photos/doc
   - Every Go package must have `doc.go` and every exported symbol must have a GoDoc comment (`revive: exported, package-comments`).
 - **Test Coverage (`make test-coverage`):**
   - Strictly **> 90.0%** statement/line coverage required overall and per layer (`domain`, `usecase`, `adapter/httpapi`, `adapter/sqlite`, `adapter/media`, and `web/`).
-- **End-to-End Verification (`make test-e2e` & `make check`):**
+- **End-to-End & Performance Verification (`make test-e2e`, `make test-perf` & `make check`):**
   - Standalone black-box Playwright suite in `e2e/` must pass all core user journeys.
+  - Performance benchmarks (`make test-perf`) must pass latency and scale budgets (`< 25ms` `p95` SQLite search on 10,000+ photos, `< 500ms` fast-skip incremental scan, and Playwright UI scale checks).
