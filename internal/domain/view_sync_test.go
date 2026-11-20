@@ -170,10 +170,23 @@ func TestViewAndSyncStructsInstantiation(t *testing.T) {
 		ByFolder:        []domain.FolderStat{{FolderPath: "2026", Count: 9}},
 	}
 	page := domain.PaginatedPhotos{Items: []domain.Photo{{ID: "p1"}}, Total: 1, Page: 1, PageSize: 50}
+	move := domain.FileMove{
+		FileID:       "f1",
+		RelativePath: "2026/Renamed.CR3",
+		FileName:     "Renamed.CR3",
+		FolderPath:   "2026",
+	}
+	meta := domain.MediaMetadata{
+		Width:       6000,
+		Height:      4000,
+		DurationSec: 0,
+		TakenAt:     &now,
+		EXIF:        domain.EXIFMetadata{Orientation: 6},
+	}
 
 	if view.Source != domain.ViewSourceDwell || vStats.TotalViews != 10 || tagCount.Count != 7 ||
 		scanned.Format != domain.FormatCR3 || dup.FileCount != 2 || report.Status != domain.SyncStatusCompleted ||
-		libStats.TotalPhotos != 9 || page.Total != 1 {
+		libStats.TotalPhotos != 9 || page.Total != 1 || move.FileID != "f1" || meta.EXIF.Orientation != 6 {
 		t.Fatal("unexpected zero field in domain structs")
 	}
 }
