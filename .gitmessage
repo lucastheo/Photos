@@ -1,0 +1,16 @@
+# <type>(<scope>): <short summary in imperative mood, max 72 chars>
+#
+# Types:
+#   feat     - A new feature
+#   fix      - A bug fix
+#   refactor - Code change that neither fixes a bug nor adds a feature
+#   test     - Adding or updating unit, integration, or Playwright E2E tests
+#   docs     - Documentation only changes (SPECIFICATION, ADR, OpenAPI, GoDoc)
+#   chore    - Build process, linter config, Makefile, or dependency updates
+#
+# Scopes:
+#   domain | usecase | httpapi | sqlite | media | config | web | e2e | docs | build
+#
+# Why is this change necessary? What problem does it solve?
+
+# How does it address the issue? (Reference ADR or Phase if applicable)
