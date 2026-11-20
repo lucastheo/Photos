@@ -1,0 +1,97 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    paths:
+      - (^|/)node_modules(/|$)
+      - (^|/)dist(/|$)
+      - (^|/)data(/|$)
+      - (^|/)bin(/|$)
+  settings:
+    gofumpt:
+      module-path: github.com/lucastheo/photos
+      extra:
+        group-params: true
+        clothe-returns: true
+
+linters:
+  default: standard
+  enable:
+    - depguard
+    - ireturn
+    - funlen
+    - revive
+  exclusions:
+    paths:
+      - (^|/)node_modules(/|$)
+      - (^|/)dist(/|$)
+      - (^|/)data(/|$)
+      - (^|/)bin(/|$)
+    rules:
+      - path: _test\.go$
+        linters:
+          - funlen
+  settings:
+    funlen:
+      lines: 60
+      statements: -1
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: package-comments
+        - name: exported
+    depguard:
+      rules:
+        domain:
+          list-mode: strict
+          files:
+            - "**/internal/domain/**"
+          allow:
+            - $gostd
+            - golang.org/x/text/unicode/norm
+            - github.com/lucastheo/photos/internal/domain
+        usecase:
+          list-mode: strict
+          files:
+            - "**/internal/usecase/**"
+          allow:
+            - $gostd
+            - github.com/lucastheo/photos/internal/domain
+            - github.com/lucastheo/photos/internal/usecase
+            - golang.org/x/sync/errgroup
+        httpapi:
+          list-mode: strict
+          files:
+            - "**/internal/adapter/httpapi/**"
+          allow:
+            - $gostd
+            - github.com/lucastheo/photos/internal/domain
+            - github.com/lucastheo/photos/internal/adapter/httpapi
+            - golang.org/x/time/rate
+        sqlite:
+          list-mode: strict
+          files:
+            - "**/internal/adapter/sqlite/**"
+          allow:
+            - $gostd
+            - github.com/lucastheo/photos/internal/domain
+            - github.com/lucastheo/photos/internal/adapter/sqlite
+            - modernc.org/sqlite
+        media:
+          list-mode: strict
+          files:
+            - "**/internal/adapter/media/**"
+          allow:
+            - $gostd
+            - github.com/lucastheo/photos/internal/domain
+            - github.com/lucastheo/photos/internal/adapter/media
+            - golang.org/x/sync/errgroup

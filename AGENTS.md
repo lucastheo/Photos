@@ -8,7 +8,7 @@ Read this file and [docs/SPECIFICATION.md](file:///home/theo/Projects/Photos/doc
 
 1. **Strict 3-Struct Separation Across Layers:**
    - **HTTP Request/Response DTOs (`internal/adapter/httpapi`):** Used **only** at the HTTP boundary (`json:"..."` tags live here). Converted explicitly to/from `domain` structs in `internal/adapter/httpapi/mapper.go`.
-   - **Pure Domain Objects (`internal/domain`):** Pure Go structs with **zero** struct tags (`no json`, `no db`) and **zero** interfaces. Imports Go standard library (`$gostd`) only.
+   - **Pure Domain Objects (`internal/domain`):** Pure Go structs with **zero** struct tags (`no json`, `no db`) and **zero** interfaces. Imports Go standard library (`$gostd`) and `golang.org/x/text/unicode/norm` (for Unicode NFC normalization of emoji tags and relative paths) only.
    - **Database Entities (`internal/adapter/sqlite`):** Used **only** inside `internal/adapter/sqlite` (`db:"..."` / SQL scan targets). Converted explicitly to/from `domain` structs in `internal/adapter/sqlite/mapper.go`.
 2. **"Accept Interfaces, Return Structs" (`ireturn` & `depguard`):**
    - **Define interfaces only in the consuming package** (`internal/usecase` defines store/scanner interfaces; `internal/adapter/httpapi` defines use-case interfaces).
