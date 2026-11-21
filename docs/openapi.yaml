@@ -1,0 +1,648 @@
+openapi: 3.1.0
+info:
+  title: Photo View Tracker API
+  version: 0.3.0
+  description: >
+    Single-user local/self-hosted photo and video library viewer that tracks view
+    counts, timestamped view history, emoji tags, RAW+JPEG stacks, and exact
+    SHA-256 duplicates without modifying the read-only photo library.
+servers:
+  - url: http://localhost:8080
+    description: Local server
+security:
+  - sessionCookie: []
+paths:
+  /api/v1/health:
+    get:
+      summary: Health and readiness check
+      security: []
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Database, library path, or cache path unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/v1/auth/session:
+    get:
+      summary: Check current authentication session status
+      security: []
+      responses:
+        "200":
+          description: Session status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+  /api/v1/auth/login:
+    post:
+      summary: Authenticate with configured password and receive HttpOnly session cookie
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "429":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/auth/logout:
+    post:
+      summary: Clear session cookie
+      security: []
+      responses:
+        "200":
+          description: Session cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+  /api/v1/photos:
+    get:
+      summary: Search, filter, sort, and paginate photos and videos
+      parameters:
+        - name: min_views
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: max_views
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: exact_views
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: emoji_tags
+          in: query
+          description: Comma-separated or repeated emoji tags evaluated with AND semantics
+          schema: { type: string }
+        - name: untagged
+          in: query
+          schema: { type: boolean }
+        - name: formats
+          in: query
+          description: Comma-separated or repeated lowercase formats (cr3, heic, jpg, mp4, ...)
+          schema: { type: string }
+        - name: media_type
+          in: query
+          schema: { type: string, enum: [photo, video] }
+        - name: folder
+          in: query
+          schema: { type: string }
+        - name: has_gps
+          in: query
+          schema: { type: boolean }
+        - name: min_lat
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: max_lat
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: min_lng
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+        - name: max_lng
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+        - name: from_date
+          in: query
+          schema: { type: string, description: "RFC3339 or YYYY-MM-DD" }
+        - name: to_date
+          in: query
+          schema: { type: string, description: "RFC3339 or YYYY-MM-DD" }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [views, date_taken, last_viewed, random] }
+        - name: sort_order
+          in: query
+          schema: { type: string, enum: [asc, desc] }
+        - name: seed
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, missing], default: active }
+      responses:
+        "200":
+          description: Paginated photo results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPhotosResponse"
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}:
+    get:
+      summary: Get full photo details, EXIF metadata, emoji tags, files, and recent view history
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+      responses:
+        "200":
+          description: Photo details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoResponse"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}/views:
+    post:
+      summary: Record a new automatic view event (idempotent via optional view_id)
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordViewRequest"
+      responses:
+        "200":
+          description: Updated photo with synchronized view history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoResponse"
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+    patch:
+      summary: Manually adjust view count (increment, decrement, reset) synchronized with photo_views
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustViewRequest"
+      responses:
+        "200":
+          description: Updated photo with synchronized view history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoResponse"
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}/tags:
+    post:
+      summary: Attach a normalized Unicode emoji tag to a photo
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTagRequest"
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoResponse"
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}/tags/{emoji}:
+    delete:
+      summary: Remove a normalized emoji tag from a photo
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+        - name: emoji
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoResponse"
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/tags:
+    get:
+      summary: List all emoji tags used across active photos with counts
+      responses:
+        "200":
+          description: Emoji tag counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmojiTagCountDTO"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}/thumbnail:
+    get:
+      summary: Serve cached 400px JPEG thumbnail (defaults to CR3 > HEIC > JPG stack priority)
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+        - name: format
+          in: query
+          schema: { type: string }
+        - name: file_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: JPEG thumbnail bytes
+          content:
+            image/jpeg: {}
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}/preview:
+    get:
+      summary: Serve high-res preview (cached 2560px JPEG for RAW/HEIC; HTTP Range stream for standard images/video)
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+        - name: format
+          in: query
+          schema: { type: string }
+        - name: file_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Media preview stream
+        "206":
+          description: Partial byte range stream
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/photos/{id}/original:
+    get:
+      summary: Serve or download original media file from read-only library root with HTTP Range support
+      parameters:
+        - $ref: "#/components/parameters/PhotoID"
+        - name: format
+          in: query
+          schema: { type: string }
+        - name: file_id
+          in: query
+          schema: { type: string }
+        - name: download
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Original media bytes
+        "206":
+          description: Partial byte range stream
+        "400":
+          $ref: "#/components/responses/ProblemError"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "404":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/library/stats:
+    get:
+      summary: Get aggregate library statistics
+      responses:
+        "200":
+          description: Library stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibraryStatsResponse"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/library/duplicates:
+    get:
+      summary: List exact duplicate file groups sharing SHA-256 content hashes
+      responses:
+        "200":
+          description: Duplicate file groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DuplicateGroupDTO"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/library/missing:
+    get:
+      summary: List records currently marked missing
+      responses:
+        "200":
+          description: Missing photo records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PhotoResponse"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+    delete:
+      summary: Create automatic SQLite backup and purge missing records
+      responses:
+        "200":
+          description: Purge summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurgeMissingResponse"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/library/sync:
+    post:
+      summary: Trigger incremental 4-step library sync (synchronous by default or ?async=true)
+      parameters:
+        - name: async
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Completed sync report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncReportResponse"
+        "202":
+          description: Asynchronous sync accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncReportResponse"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+        "409":
+          $ref: "#/components/responses/ProblemError"
+        "503":
+          $ref: "#/components/responses/ProblemError"
+  /api/v1/library/sync/status:
+    get:
+      summary: Get current or latest sync run status and counters
+      responses:
+        "200":
+          description: Latest sync report or idle status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncReportResponse"
+        "401":
+          $ref: "#/components/responses/ProblemError"
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pt_session
+  parameters:
+    PhotoID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    ProblemError:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemResponse"
+  schemas:
+    ProblemResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        request_id: { type: string }
+    LoginRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string }
+    SessionResponse:
+      type: object
+      required: [authenticated, auth_disabled]
+      properties:
+        authenticated: { type: boolean }
+        auth_disabled: { type: boolean }
+    RecordViewRequest:
+      type: object
+      properties:
+        view_id: { type: string }
+        source: { type: string, enum: [dwell, manual, slideshow] }
+    AdjustViewRequest:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [increment, decrement, reset] }
+    AddTagRequest:
+      type: object
+      required: [emoji]
+      properties:
+        emoji: { type: string }
+    EmojiTagCountDTO:
+      type: object
+      required: [emoji, count]
+      properties:
+        emoji: { type: string }
+        count: { type: integer, format: int64 }
+    PhotoFileDTO:
+      type: object
+      required: [id, relative_path, file_name, folder_path, content_hash, format, file_size, status]
+      properties:
+        id: { type: string }
+        relative_path: { type: string }
+        file_name: { type: string }
+        folder_path: { type: string }
+        content_hash: { type: string }
+        format: { type: string }
+        file_size: { type: integer, format: int64 }
+        status: { type: string }
+    EXIFMetadataDTO:
+      type: object
+      required: [orientation]
+      properties:
+        orientation: { type: integer }
+        camera_make: { type: string }
+        camera_model: { type: string }
+        lens_model: { type: string }
+        iso: { type: integer }
+        f_number: { type: number }
+        exposure_time: { type: string }
+        focal_length_mm: { type: number }
+        gps_latitude: { type: number }
+        gps_longitude: { type: number }
+    ViewEventDTO:
+      type: object
+      required: [id, photo_id, viewed_at, source]
+      properties:
+        id: { type: integer, format: int64 }
+        view_id: { type: string }
+        photo_id: { type: string }
+        viewed_at: { type: string, format: date-time }
+        source: { type: string }
+    PhotoResponse:
+      type: object
+      required: [id, base_name, folder_path, formats, media_type, width, height, view_count, emoji_tags, files, status, thumbnail_url, preview_url, original_url]
+      properties:
+        id: { type: string }
+        base_name: { type: string }
+        folder_path: { type: string }
+        formats:
+          type: array
+          items: { type: string }
+        media_type: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        duration_sec: { type: number }
+        taken_at: { type: string, format: date-time }
+        gps_latitude: { type: number }
+        gps_longitude: { type: number }
+        exif: { $ref: "#/components/schemas/EXIFMetadataDTO" }
+        view_count: { type: integer }
+        emoji_tags:
+          type: array
+          items: { type: string }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/PhotoFileDTO" }
+        view_history:
+          type: array
+          items: { $ref: "#/components/schemas/ViewEventDTO" }
+        last_viewed_at: { type: string, format: date-time }
+        status: { type: string }
+        thumbnail_url: { type: string }
+        preview_url: { type: string }
+        original_url: { type: string }
+    PaginatedPhotosResponse:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PhotoResponse" }
+        total: { type: integer, format: int64 }
+        page: { type: integer }
+        page_size: { type: integer }
+    SyncReportResponse:
+      type: object
+      required: [status, scanned_count, added_count, updated_count, moved_count, stacked_count, duplicate_count, unchanged_count, missing_count]
+      properties:
+        id: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        status: { type: string }
+        scanned_count: { type: integer }
+        added_count: { type: integer }
+        updated_count: { type: integer }
+        moved_count: { type: integer }
+        stacked_count: { type: integer }
+        duplicate_count: { type: integer }
+        unchanged_count: { type: integer }
+        missing_count: { type: integer }
+        error_message: { type: string }
+    DuplicateGroupDTO:
+      type: object
+      required: [content_hash, photo_id, file_count, files]
+      properties:
+        content_hash: { type: string }
+        photo_id: { type: string }
+        file_count: { type: integer }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/PhotoFileDTO" }
+    FormatStatDTO:
+      type: object
+      required: [format, count]
+      properties:
+        format: { type: string }
+        count: { type: integer, format: int64 }
+    FolderStatDTO:
+      type: object
+      required: [folder_path, count]
+      properties:
+        folder_path: { type: string }
+        count: { type: integer, format: int64 }
+    LibraryStatsResponse:
+      type: object
+      required: [total_photos, unseen_photos, seen_photos, total_views, total_files, duplicate_groups, duplicate_files, missing_photos, missing_files, by_format, by_folder]
+      properties:
+        total_photos: { type: integer, format: int64 }
+        unseen_photos: { type: integer, format: int64 }
+        seen_photos: { type: integer, format: int64 }
+        total_views: { type: integer, format: int64 }
+        total_files: { type: integer, format: int64 }
+        duplicate_groups: { type: integer, format: int64 }
+        duplicate_files: { type: integer, format: int64 }
+        missing_photos: { type: integer, format: int64 }
+        missing_files: { type: integer, format: int64 }
+        by_format:
+          type: array
+          items: { $ref: "#/components/schemas/FormatStatDTO" }
+        by_folder:
+          type: array
+          items: { $ref: "#/components/schemas/FolderStatDTO" }
+    PurgeMissingResponse:
+      type: object
+      required: [deleted_count]
+      properties:
+        deleted_count: { type: integer, format: int64 }
+    HealthResponse:
+      type: object
+      required: [status, database, library, cache]
+      properties:
+        status: { type: string }
+        database: { type: string }
+        library: { type: string }
+        cache: { type: string }

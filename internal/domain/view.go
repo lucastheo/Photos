@@ -71,3 +71,11 @@ type EmojiTagCount struct {
 	// Count is the number of active photos tagged with Emoji.
 	Count int64
 }
+
+// AuthSession represents the authentication status of a client session.
+type AuthSession struct {
+	// Authenticated reports whether the session is authenticated or auth is disabled.
+	Authenticated bool
+	// AuthDisabled reports whether password authentication is disabled by configuration.
+	AuthDisabled bool
+}
