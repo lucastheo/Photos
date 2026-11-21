@@ -14,7 +14,7 @@ import (
 	"github.com/lucastheo/photos/internal/domain"
 )
 
-const immutableMediaCacheHeader = "private, max-age=31536000, immutable"
+const immutableMediaCacheHeader = "private, max-age=604800, immutable"
 
 // Thumbnail handles GET /api/v1/photos/{id}/thumbnail, serving the cached 400px
 // JPEG thumbnail (generated on demand if missing).
