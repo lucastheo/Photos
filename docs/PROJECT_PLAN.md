@@ -82,16 +82,16 @@ flowchart TD
 **Goal:** Implement the remaining business use cases (search, view tracking, single-user auth) and expose the REST API with strict HTTP Request/Response DTO structs.
 
 ### Tasks
-- [ ] **3.1 View Tracking, Emoji Tagging & Search Use Cases (`internal/usecase`):**
+- [x] **3.1 View Tracking, Emoji Tagging & Search Use Cases (`internal/usecase`):**
   - Define consumer interfaces (`ViewStore`, `TagStore`, `PhotoSearchStore`) in `internal/usecase` and return concrete use case structs (`*TrackViewUseCase`, `*TagPhotoUseCase`, `*SearchPhotosUseCase`).
   - Implement idempotent `RecordView` (records a timestamped view event in `photo_views` with optional `view_id` and increments `view_count`).
   - Implement `AdjustViewCount` synchronized with `photo_views` (`increment` appends a `manual` timestamp; `decrement` deletes the latest timestamp and rolls back `last_viewed_unix_ns`; `reset` clears `photo_views` for that photo and sets `view_count = 0`).
   - Implement `AddEmojiTag`, `RemoveEmojiTag`, and `ListEmojiTags` (with photo counts).
   - Implement `SearchPhotos` (including `emoji_tags` AND filter, `untagged` filter, and seeded random sort), `GetLibraryStats`, and `ListDuplicates`.
-- [ ] **3.2 Single-User Authentication & Security Hardening (`internal/usecase/auth.go` & `internal/adapter/httpapi/handler_auth.go`):**
+- [x] **3.2 Single-User Authentication & Security Hardening (`internal/usecase/auth.go` & `internal/adapter/httpapi/handler_auth.go`):**
   - Implement password verification (via `PasswordVerifier` consumer interface), signed `HttpOnly` (`SameSite=Lax`) session cookies, `http.CrossOriginProtection` on mutating requests (even when `AUTH_DISABLED=true`), and an in-memory **login rate limiter** (`429 Too Many Requests`).
   - Support `AUTH_DISABLED=true` config flag for frictionless localhost usage.
-- [ ] **3.3 HTTP DTOs, Mappers, OpenAPI Contract, Observability & Graceful Shutdown (`internal/adapter/httpapi` & `cmd/phototracker`):**
+- [x] **3.3 HTTP DTOs, Mappers, OpenAPI Contract, Observability & Graceful Shutdown (`internal/adapter/httpapi` & `cmd/phototracker`):**
   - Define consumer interfaces for the use cases inside `internal/adapter/httpapi` and return concrete handler structs (`*PhotoHandler`, `*SyncHandler`, `*AuthHandler`).
   - Define HTTP Request and Response DTO structs (`dto_photo.go`, `dto_sync.go`, `dto_auth.go`) with validation and document the full REST contract in `docs/openapi.yaml` (OpenAPI 3.1).
   - Write explicit `mapper.go` functions converting HTTP DTOs ↔ Domain Objects, plus a deterministic **Domain Error → HTTP Problem JSON mapper** (`{"code", "message", "request_id"}`).

@@ -98,6 +98,10 @@ func TestSentinelErrorsDistinct(t *testing.T) {
 		domain.ErrSettingNotFound,
 		domain.ErrUnsupportedFormat,
 		domain.ErrLibraryUnavailable,
+		domain.ErrInvalidCredentials,
+		domain.ErrUnauthorized,
+		domain.ErrRateLimited,
+		domain.ErrInvalidInput,
 	}
 
 	for i := range sentinels {

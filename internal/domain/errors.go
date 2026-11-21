@@ -35,4 +35,16 @@ var (
 
 	// ErrLibraryUnavailable indicates that the configured library directory is unreadable or empty.
 	ErrLibraryUnavailable = errors.New("library path is unavailable or empty")
+
+	// ErrInvalidCredentials indicates that the supplied authentication credentials are invalid.
+	ErrInvalidCredentials = errors.New("invalid credentials")
+
+	// ErrUnauthorized indicates that a request requires an authenticated session.
+	ErrUnauthorized = errors.New("unauthorized")
+
+	// ErrRateLimited indicates that too many requests were attempted in the rate limit window.
+	ErrRateLimited = errors.New("rate limit exceeded")
+
+	// ErrInvalidInput indicates that a request payload or parameter failed validation.
+	ErrInvalidInput = errors.New("invalid input")
 )

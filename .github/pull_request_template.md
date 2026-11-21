@@ -10,4 +10,4 @@
 - [ ] **Unit & Integration Tests (> 90% Coverage):** `make test-unit`, `make test-integration`, and `make test-coverage` pass with strictly **> 90.0%** coverage.
 - [ ] **Playwright Black-Box E2E (if UI/API changed):** `make test-e2e` passes all end-to-end browser journeys.
 - [ ] **Performance Benchmarks (`make test-perf`):** Go benchmarks and UI/API latency budgets pass without regressions.
-- [ ] **Documentation Updated:** Updated GoDoc comments, `docs/openapi.yaml`, `docs/FEATURES.md`, or `docs/adr/` if applicable.
+- [ ] **Documentation Updated:** Updated GoDoc comments, `.env.example`, `docs/openapi.yaml`, `docs/FEATURES.md`, or `docs/adr/` if applicable.
