@@ -164,6 +164,21 @@ func TestLoadFromFileAndEnv(t *testing.T) {
 		}
 	})
 
+	t.Run("repository .env.example parses and validates", func(t *testing.T) {
+		t.Parallel()
+		examplePath := filepath.Join("..", "..", ".env.example")
+		cfg, err := config.LoadFromFileAndEnv(examplePath, nil)
+		if err != nil {
+			t.Fatalf("LoadFromFileAndEnv(%q) failed: %v", examplePath, err)
+		}
+		if cfg.LibraryPath != "./photos" || cfg.DBPath != "./data/photos.db" ||
+			cfg.CachePath != "./data/cache" || cfg.Host != "127.0.0.1" ||
+			cfg.Port != 8080 || cfg.AuthDisabled || cfg.AuthPassword != "change-me" ||
+			cfg.CookieSecure || cfg.LogFormat != "text" || cfg.LogLevel != "info" {
+			t.Fatalf("unexpected .env.example config: %+v", cfg)
+		}
+	})
+
 	t.Run("Load wrapper uses defaults when no env set", func(t *testing.T) {
 		cfg, err := config.Load()
 		if err != nil {

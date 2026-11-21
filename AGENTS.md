@@ -57,3 +57,5 @@ Read this file and [docs/SPECIFICATION.md](file:///home/theo/Projects/Photos/doc
 - **End-to-End & Performance Verification (`make test-e2e`, `make test-perf` & `make check`):**
   - Standalone black-box Playwright suite in `e2e/` must pass all core user journeys.
   - Performance benchmarks (`make test-perf`) must pass latency and scale budgets (`< 25ms` `p95` SQLite search on 10,000+ photos, `< 500ms` fast-skip incremental scan, and Playwright UI scale checks).
+- **Configuration & `.env.example` Sync:**
+  - Whenever an environment variable in `internal/config` is added, renamed, removed, or has its default changed, update `.env.example` (and its validation test in `internal/config/config_test.go`, plus `README.md` once added) in the same change.

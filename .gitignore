@@ -21,3 +21,8 @@ e2e/playwright-report/
 
 # OS / Editor files
 .DS_Store
+
+# Local environment files (keep .env.example tracked)
+.env
+.env.*
+!.env.example

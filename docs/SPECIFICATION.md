@@ -758,12 +758,12 @@ To make running the app effortless with all RAW/HEIC/Video dependencies pre-inst
 
 To keep the project approachable for both developers and AI coding agents over time, the repository enforces 5 documentation layers:
 
-1. **User & Operations Documentation (`README.md` & `docs/FEATURES.md`):**
-   - `README.md`: Quickstart commands (native & Docker Compose), complete `.env` variable reference table, required media dependencies (`exiftool`, `ffmpeg`, `libheif`), and instructions on how to safely share/sync the SQLite `.db` file across machines.
+1. **User & Operations Documentation (`README.md`, `.env.example` & `docs/FEATURES.md`):**
+   - `.env.example` & `README.md`: Quickstart commands (native & Docker Compose), complete `.env` variable reference template and table (kept in sync whenever environment variables in `internal/config` are added, renamed, removed, or have defaults changed), required media dependencies (`exiftool`, `ffmpeg`, `libheif`), and instructions on how to safely share/sync the SQLite `.db` file across machines.
    - `docs/FEATURES.md`: User guide covering the 1.5s dwell view counter, `RAW + JPEG` stacking, exact duplicate tracking, emoji tagging & filtering, GPS location filtering, and incremental Re-import.
 2. **AI & Contributor Rulebook (`AGENTS.md` at Repo Root):**
    - High-signal architectural rulebook read automatically by AI agents and contributors before modifying code.
-   - Summarizes the 3-Struct separation (DTO ↔ Domain ↔ Entity), *"Accept interfaces, return structs"*, `depguard`/`ireturn` rules, `GoogleChrome/modern-web-guidance` usage, the 1,000-line max file limit, and the mandatory `make check` (`> 90%` coverage + Playwright E2E) gate.
+   - Summarizes the 3-Struct separation (DTO ↔ Domain ↔ Entity), *"Accept interfaces, return structs"*, `depguard`/`ireturn` rules, `GoogleChrome/modern-web-guidance` usage, the 1,000-line max file limit, keeping `.env.example` in sync with `internal/config`, and the mandatory `make check` (`> 90%` coverage + Playwright E2E) gate.
 3. **Linter-Enforced GoDoc Comments (`revive`):**
    - Every Go package includes a `doc.go` package comment explaining its layer and responsibility, and every exported type, interface, and function includes a GoDoc comment.
    - Enforced automatically by `golangci-lint` (`revive` rules: `exported` and `package-comments`).
@@ -782,4 +782,4 @@ To keep the project approachable for both developers and AI coding agents over t
      - [ ] **File & Function Size Limits:** `make lint-max-file` passes (all files ≤ 1,000 lines, functions ≤ 60 lines).
      - [ ] **Linters & GoDoc:** `make lint` (`golangci-lint`, `eslint`, `tsc`, `revive` GoDoc checks) passes with 0 warnings.
      - [ ] **Test Coverage > 90%:** `make test-unit`, `make test-integration`, and `make test-coverage` pass with **> 90.0%** coverage.
-     - [ ] **End-to-End Verification:** `make test-e2e` (Playwright black-box journeys) and documentation (`openapi.yaml` / `FEATURES.md`) are updated if applicable.
+     - [ ] **End-to-End Verification:** `make test-e2e` (Playwright black-box journeys) and documentation (`.env.example` / `openapi.yaml` / `FEATURES.md`) are updated if applicable.
