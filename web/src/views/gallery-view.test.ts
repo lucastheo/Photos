@@ -279,6 +279,7 @@ describe('PhotoGalleryView', () => {
 
     const el = document.createElement('photo-gallery-view') as PhotoGalleryView;
     el.api = api;
+    el.libraryTotal = 150;
     document.body.appendChild(el);
     await new Promise((r) => setTimeout(r, 0));
     await el.updateComplete;
@@ -304,7 +305,7 @@ describe('PhotoGalleryView', () => {
     expect(el.shadowRoot?.querySelector('#filter-controls #sort-select')).toBeNull();
     expect(el.shadowRoot?.querySelector('.filter-toggle-row .muted')).toBeNull();
     expect(el.shadowRoot?.querySelector('#filter-controls .filter-row:last-child .muted')?.textContent).toContain(
-      '42 item(s)',
+      'Showing 42 of 150 photos',
     );
     expect(localStorage.getItem('photos.gallery.filtersHidden')).toBe('true');
 

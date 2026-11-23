@@ -253,6 +253,9 @@ export class PhotoGalleryView extends LitElement {
   @property({ attribute: false })
   folders: FolderStatDTO[] = [];
 
+  @property({ type: Number })
+  libraryTotal?: number;
+
   @state()
   items: PhotoResponse[] = [];
 
@@ -790,9 +793,13 @@ export class PhotoGalleryView extends LitElement {
           ${this.renderPathRow()}
           ${this.renderGpsRow()}
           ${this.renderDateRow()}
-          <div class="filter-row">
-            <span class="muted">${this.total} item(s)</span>
-          </div>
+          ${this.libraryTotal !== undefined && this.libraryTotal !== null
+            ? html`
+                <div class="filter-row">
+                  <span class="muted">Showing ${this.total} of ${this.libraryTotal} photos</span>
+                </div>
+              `
+            : null}
         </div>
       </section>
       ${this.errorMessage ? html`<p class="error-banner" role="alert">${this.errorMessage}</p>` : null}

@@ -340,6 +340,7 @@ export class PhotoTrackerApp extends LitElement {
       .api=${this.api}
       .filter=${this.galleryFilter}
       .folders=${this.stats?.by_folder ?? []}
+      .libraryTotal=${this.stats?.total_photos}
     ></photo-gallery-view>`;
   }
 
