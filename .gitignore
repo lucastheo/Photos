@@ -4,6 +4,7 @@ coverage.out
 
 # Runtime data and SQLite backups
 data/
+photos/
 *.db
 *.db-wal
 *.db-shm

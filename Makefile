@@ -1,11 +1,20 @@
-.PHONY: build run test-unit test-integration test-coverage test-perf test-e2e lint lint-max-file check
+.PHONY: build run run-api run-web test-unit test-integration test-coverage test-perf test-e2e lint lint-max-file check
 
 build:
 	go build -o bin/phototracker ./cmd/phototracker
 	npm --prefix web run build
 
 run:
+	@trap 'trap - INT TERM EXIT; kill 0' INT TERM EXIT; \
+	go run ./cmd/phototracker & \
+	npm --prefix web run dev & \
+	wait
+
+run-api:
 	go run ./cmd/phototracker
+
+run-web:
+	npm --prefix web run dev
 
 test-unit:
 	go test -short -race ./cmd/... ./internal/...
