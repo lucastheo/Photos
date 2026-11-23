@@ -55,6 +55,8 @@ export class PhotoGalleryView extends LitElement {
       .filter-panel {
         display: grid;
         gap: 0.75rem;
+        padding-block-end: 0.85rem;
+        border-bottom: 1px solid var(--border-color, #cbd5e1);
       }
 
       .filter-controls {
@@ -780,7 +782,7 @@ export class PhotoGalleryView extends LitElement {
 
   override render() {
     return html`
-      <section class="card filter-panel" aria-label="Search and filter controls">
+      <section class="filter-panel" aria-label="Search and filter controls">
         ${this.renderFilterToggle()}
         <div id="filter-controls" class="filter-controls" ?hidden=${this.filtersHidden}>
           ${this.renderViewPresets()}
