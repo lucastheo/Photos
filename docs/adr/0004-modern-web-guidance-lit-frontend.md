@@ -11,9 +11,9 @@ The frontend needs fast gallery rendering, smooth thumbnail-to-lightbox transiti
 
 1. **TypeScript + Vite + Lit (Native Web Components):**
    - Build the UI in `web/` using Lit and native browser APIs championed by `GoogleChrome/modern-web-guidance`:
-     - Native `<dialog>` for the expanded Lightbox overlay.
+     - Native `<dialog>` sized full-viewport (`100dvw × 100dvh`) with uncropped `object-fit: contain` media scaling and floating HUD overlays (toolbar + details drawer) revealed on pointer movement (`2.2s` idle fade-out) for distraction-free viewing.
      - **View Transitions API** (`document.startViewTransition` with `prefers-reduced-motion` guard) for expanding thumbnails and navigating photos.
-     - Native **Popover API** for filter/emoji popovers and responsive CSS Grid with `loading="lazy"` / `decoding="async"`.
+     - Native **Popover API** for filter/emoji popovers and responsive CSS Grid with uncropped `object-fit: contain` thumbnails and `loading="lazy"` / `decoding="async"`.
 2. **1.5s Dwell Timer & Stable Browsing Queue:**
    - Start the 1.5s view timer only after `<img>` `load` or `<video>` `loadeddata` while `document.visibilityState === 'visible'`.
    - Update viewed photo badges (`👁 0` → `👁 1`) in-place during the active browsing session without removing cards from the open Gallery/Lightbox queue.

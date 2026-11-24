@@ -30,7 +30,7 @@ flowchart TD
   - Install `GoogleChrome/modern-web-guidance` skills into the workspace for frontend implementation guidance.
   - Create root `AGENTS.md` (AI & contributor rulebook), `.gitmessage` (Conventional Commits template), `.github/pull_request_template.md` (PR quality gate checklist), and initial Architecture Decision Records (`docs/adr/0001..0004`).
   - Create `.golangci.yml` with `depguard` (enforcing strict separation between `internal/domain`, `internal/usecase`, `internal/adapter/httpapi`, `internal/adapter/sqlite`, and `internal/adapter/media`), `ireturn` (`allow: [anon, error, empty, stdlib, generic]`, enforcing **"Accept interfaces, return structs"**), `funlen` (max 60 lines in production code, excluding `*_test.go`), and `revive` (`exported` + `package-comments` enforcing GoDoc comments on all packages and exported symbols).
-  - Create root `Makefile` with targets: `build`, `run`, `test-unit`, `test-integration`, `test-coverage` (enforcing **> 90.0%** statement/line coverage per layer across Go and Frontend), `test-perf` (running Go benchmarks and performance latency assertions), `lint`, `lint-max-file` (enforcing ≤ 1,000 lines per file), and `check` (running all gates).
+  - Create root `Makefile` with targets: `build`, `run` (starting both Go API and Vite dev server with `/api` proxy), `run-api`, `run-web`, `test-unit`, `test-integration`, `test-coverage` (enforcing **> 90.0%** statement/line coverage per layer across Go and Frontend), `test-perf` (running Go benchmarks and performance latency assertions), `lint`, `lint-max-file` (enforcing ≤ 1,000 lines per file), and `check` (running all gates).
 - [x] **1.2 Pure Domain Models (`internal/domain`):**
   - Define pure Go structs (`Photo`, `PhotoFile`, `ScannedFile`, `DuplicateGroup`, `EXIFMetadata`, `ViewEvent`, `EmojiTagCount`, `PhotoFilter`, `SyncReport`, `LibraryStats`) with **zero** JSON or DB struct tags and **zero** interfaces (interfaces live at their consumers in `usecase` and `adapter/httpapi`).
   - Write table-driven unit tests (`internal/domain/*_test.go`) achieving `> 90%` coverage on domain validation (including NFC-normalized emoji tag validation, still-photo-only `stack_key` computation, and media format priority `CR3 > HEIC > JPG`).
@@ -112,11 +112,11 @@ flowchart TD
 **Goal:** Build the 4 frontend views in `web/` using TypeScript, Vite, Lit Web Components, and native web platform features (`<dialog>`, View Transitions API, Popover API, responsive CSS Grid) guided by `GoogleChrome/modern-web-guidance`.
 
 ### Tasks
-- [ ] **4.1 App Shell, Router & API Client (`web/src/`):**
+- [x] **4.1 App Shell, Router & API Client (`web/src/`):**
   - Typed REST client matching the backend DTO contracts.
   - Navigation header displaying quick library stats (e.g., Unseen count) and quick **"Re-import"** indicator.
   - **Login View (`/login`)** with semantic form and session check.
-- [ ] **4.2 Gallery & Search View (`/`) (`web/src/views/gallery-view.ts`):**
+- [x] **4.2 Gallery & Search View (`/`) (`web/src/views/gallery-view.ts`):**
   - **Filter Bar:**
     - View count quick chips (`All`, `Never Seen (0)`, `Seen Once (1)`, `Rarely Seen (1–2)`, `3+`) + custom `Min` / `Max` inputs.
     - **Emoji Tag Filter Bar:** Interactive emoji chips with photo counts (e.g., `❤️ 12`, `🏖️ 5`) using `AND` semantics, plus an `Untagged` chip.
@@ -124,15 +124,15 @@ flowchart TD
     - Folder filter, **GPS Location (`📍 Has GPS` + bounding box)** filter, date range filter, filename search, and Sort dropdown (`Least Viewed`, `Most Viewed`, `Date Taken`, `Last Viewed`, `Random Discovery` with deterministic session `seed`).
   - **Thumbnail Grid & Stable Browsing Session:**
     - Responsive CSS Grid with lazy-loaded thumbnails, `👁 <view_count>` badge (updating in-place when viewed without removing the card from the active browsing queue), attached emoji tag badges (`❤️ 🏖️`), `📍` GPS badge, and format/stack badge (`CR3 + JPG`, `HEIC`, `MP4 01:15`).
-- [ ] **4.3 Expanded Lightbox & Details Overlay (`/photo/:id`) (`web/src/components/photo-lightbox.ts`):**
-  - Native `<dialog>` modal with **View Transitions API** animation from the clicked thumbnail.
+- [x] **4.3 Expanded Lightbox & Details Overlay (`/photo/:id`) (`web/src/components/photo-lightbox.ts`):**
+  - Full-viewport (`100dvw × 100dvh`) native `<dialog>` modal scaling media uncropped (`object-fit: contain`) with **View Transitions API** animation and an auto-hiding floating HUD (toolbar + Details drawer) revealed on mouse movement (`2.2s` idle fade-out).
   - **1.5-Second Dwell Timer:** Starts after media load (`load`/`loadeddata`) while `document.visibilityState === 'visible'`; automatically records an idempotent view (`POST /api/v1/photos/{id}/views`) when open for ≥ 1.5s, updating the count badge live.
   - Keyboard shortcuts (`←` Prev, `→` Next, `Space` Play/Pause, `i` Details Drawer, `Esc` Close).
   - **Slideshow Mode:** Auto-advances through the current filtered result set at a configurable interval (e.g., 4s), counting views along the way.
   - **`RAW + JPEG` Variant Switcher:** Pill toggle (`CR3` | `JPG`, defaulting to `CR3`) in the lightbox toolbar when viewing a stacked camera pair (toggling variants does not count an extra view).
   - **Emoji Tagging Controls:** Quick-emoji bar in the lightbox + Emoji Tags card in the Details Drawer to add/remove emoji tags (`❤️`, `⭐`, `🔥`, `🏖️`, `😂`, `🎉`, or custom emoji picker).
   - **Details Drawer:** Displays `view_count` with manual `+1`, `-1`, and `Reset` buttons, scrollable view history timestamps, active emoji tags, all physical file locations/variants (`Files & Locations` card), **GPS Location & Map link (`Filter Nearby Photos` + OpenStreetMap/Google Maps link)**, EXIF camera metadata, and `SHA-256` hashes.
-- [ ] **4.4 Library Sync & Stats View (`/library`) (`web/src/views/library-view.ts`):**
+- [x] **4.4 Library Sync & Stats View (`/library`) (`web/src/views/library-view.ts`):**
   - **"Re-import / Sync Library" Button** with live progress polling (`Scanned`, `Added`, `Moved/Relinked`, `Stacked`, `Duplicates`, `Unchanged`, `Missing`).
   - Library seen/unseen coverage visualization and breakdown by format.
   - **Duplicate Files Inspector** listing exact `SHA-256` duplicates across folders, plus **Missing Files** table with **"Purge Missing Records"** button.

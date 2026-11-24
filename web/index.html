@@ -3,7 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Photo View Tracker</title>
+    <style>
+      :root {
+        --bg-canvas-light: #fafafa;
+        --bg-canvas-dark: #09090b;
+        --bg-surface-light: #ffffff;
+        --bg-surface-dark: #141417;
+        --bg-subtle-light: #e4e4e7;
+        --bg-subtle-dark: #27272a;
+        --text-primary-light: #09090b;
+        --text-primary-dark: #fafafa;
+        --text-muted-light: #52525b;
+        --text-muted-dark: #a1a1aa;
+        --border-light: #d4d4d8;
+        --border-dark: #27272a;
+        --accent-light: #18181b;
+        --accent-dark: #f4f4f5;
+        --accent-text-light: #ffffff;
+        --accent-text-dark: #18181b;
+        --unseen-light: #d97706;
+        --unseen-dark: #fbbf24;
+        --danger-light: #dc2626;
+        --danger-dark: #f87171;
+        --success-light: #059669;
+        --success-dark: #34d399;
+
+        --bg-canvas: var(--bg-canvas-light);
+        --bg-surface: var(--bg-surface-light);
+        --bg-subtle: var(--bg-subtle-light);
+        --text-primary: var(--text-primary-light);
+        --text-muted: var(--text-muted-light);
+        --border-color: var(--border-light);
+        --accent: var(--accent-light);
+        --accent-text: var(--accent-text-light);
+        --unseen: var(--unseen-light);
+        --danger: var(--danger-light);
+        --success: var(--success-light);
+
+        color-scheme: light dark;
+        accent-color: var(--accent);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-canvas: var(--bg-canvas-dark);
+          --bg-surface: var(--bg-surface-dark);
+          --bg-subtle: var(--bg-subtle-dark);
+          --text-primary: var(--text-primary-dark);
+          --text-muted: var(--text-muted-dark);
+          --border-color: var(--border-dark);
+          --accent: var(--accent-dark);
+          --accent-text: var(--accent-text-dark);
+          --unseen: var(--unseen-dark);
+          --danger: var(--danger-dark);
+          --success: var(--success-dark);
+        }
+      }
+
+      @supports (color: light-dark(white, black)) {
+        :root {
+          --bg-canvas: light-dark(var(--bg-canvas-light), var(--bg-canvas-dark));
+          --bg-surface: light-dark(var(--bg-surface-light), var(--bg-surface-dark));
+          --bg-subtle: light-dark(var(--bg-subtle-light), var(--bg-subtle-dark));
+          --text-primary: light-dark(var(--text-primary-light), var(--text-primary-dark));
+          --text-muted: light-dark(var(--text-muted-light), var(--text-muted-dark));
+          --border-color: light-dark(var(--border-light), var(--border-dark));
+          --accent: light-dark(var(--accent-light), var(--accent-dark));
+          --accent-text: light-dark(var(--accent-text-light), var(--accent-text-dark));
+          --unseen: light-dark(var(--unseen-light), var(--unseen-dark));
+          --danger: light-dark(var(--danger-light), var(--danger-dark));
+          --success: light-dark(var(--success-light), var(--success-dark));
+        }
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: var(--bg-canvas);
+        color: var(--text-primary);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        ::view-transition-group(*),
+        ::view-transition-old(*),
+        ::view-transition-new(*) {
+          animation: none !important;
+        }
+      }
+    </style>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>

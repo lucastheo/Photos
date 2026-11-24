@@ -171,7 +171,7 @@ func TestLoadFromFileAndEnv(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadFromFileAndEnv(%q) failed: %v", examplePath, err)
 		}
-		if cfg.LibraryPath != "./photos" || cfg.DBPath != "./data/photos.db" ||
+		if cfg.LibraryPath != "./examples/photos" || cfg.DBPath != "./data/photos.db" ||
 			cfg.CachePath != "./data/cache" || cfg.Host != "127.0.0.1" ||
 			cfg.Port != 8080 || cfg.AuthDisabled || cfg.AuthPassword != "change-me" ||
 			cfg.CookieSecure || cfg.LogFormat != "text" || cfg.LogLevel != "info" {
