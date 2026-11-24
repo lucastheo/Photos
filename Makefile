@@ -1,4 +1,4 @@
-.PHONY: build run run-api run-web test-unit test-integration test-coverage test-perf test-e2e lint lint-max-file check
+.PHONY: build run run-api run-web seed-examples test-unit test-integration test-coverage test-perf test-e2e lint lint-max-file check
 
 build:
 	go build -o bin/phototracker ./cmd/phototracker
@@ -15,6 +15,10 @@ run-api:
 
 run-web:
 	npm --prefix web run dev
+
+seed-examples:
+	mkdir -p photos
+	cp -rn examples/photos/. photos/
 
 test-unit:
 	go test -short -race ./cmd/... ./internal/...
