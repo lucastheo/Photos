@@ -42,6 +42,11 @@ function readFiltersHidden(): boolean {
   }
 }
 
+/** Cards at or after this index get content-visibility deferral. */
+const DEFERRED_CARD_START_INDEX = 12;
+/** Leading cards loaded eagerly with high fetch priority. */
+const LCP_CANDIDATE_COUNT = 2;
+
 @customElement('photo-gallery-view')
 export class PhotoGalleryView extends LitElement {
   static override styles = [
@@ -706,8 +711,8 @@ export class PhotoGalleryView extends LitElement {
   }
 
   private renderPhotoCard(photo: PhotoResponse, index: number) {
-    const isDeferred = index >= 12;
-    const isLcpCandidate = index < 2;
+    const isDeferred = index >= DEFERRED_CARD_START_INDEX;
+    const isLcpCandidate = index < LCP_CANDIDATE_COUNT;
     const hasGps =
       photo.gps_latitude !== undefined &&
       photo.gps_latitude !== null &&

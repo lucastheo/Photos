@@ -413,7 +413,8 @@ export class PhotoLightbox extends LitElement {
   private async fetchFullPhoto(id: string): Promise<void> {
     try {
       const full = await this.api.getPhoto(id);
-      if (this.photo?.id === id) {
+      // Skip if a view was already recorded: the recordView response is newer.
+      if (this.photo?.id === id && !this.dwellTimer.isCounted()) {
         this.photo = full;
       }
     } catch (err) {

@@ -16,6 +16,7 @@ function defaultViewId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
+  // Non-crypto fallback is fine: view_id is only an idempotency key, not a secret.
   return `view-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 

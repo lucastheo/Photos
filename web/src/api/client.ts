@@ -28,7 +28,13 @@ export class ApiError extends Error {
   }
 }
 
+const API_PREFIX = '/api/v1';
+const LOGIN_PATH = `${API_PREFIX}/auth/login`;
+
 export class ApiClient {
+  /** Invoked when a non-login request is rejected with 401 (expired session). */
+  onUnauthorized?: () => void;
+
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
 
@@ -47,6 +53,9 @@ export class ApiClient {
       },
     });
     if (!res.ok) {
+      if (res.status === 401 && path !== LOGIN_PATH) {
+        this.onUnauthorized?.();
+      }
       let problem: Partial<ProblemResponse> = {};
       try {
         problem = (await res.json()) as Partial<ProblemResponse>;
@@ -64,45 +73,45 @@ export class ApiClient {
   }
 
   getSession(): Promise<SessionResponse> {
-    return this.request<SessionResponse>('/api/v1/auth/session');
+    return this.request<SessionResponse>(`${API_PREFIX}/auth/session`);
   }
 
   login(password: string): Promise<SessionResponse> {
-    return this.request<SessionResponse>('/api/v1/auth/login', {
+    return this.request<SessionResponse>(`${API_PREFIX}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ password }),
     });
   }
 
   logout(): Promise<SessionResponse> {
-    return this.request<SessionResponse>('/api/v1/auth/logout', { method: 'POST' });
+    return this.request<SessionResponse>(`${API_PREFIX}/auth/logout`, { method: 'POST' });
   }
 
   listPhotos(filter: PhotoFilterParams = {}): Promise<PaginatedPhotosResponse> {
     const qs = filterToSearchParams(filter).toString();
-    return this.request<PaginatedPhotosResponse>(qs ? `/api/v1/photos?${qs}` : '/api/v1/photos');
+    return this.request<PaginatedPhotosResponse>(qs ? `${API_PREFIX}/photos?${qs}` : `${API_PREFIX}/photos`);
   }
 
   getPhoto(id: string): Promise<PhotoResponse> {
-    return this.request<PhotoResponse>(`/api/v1/photos/${encodeURIComponent(id)}`);
+    return this.request<PhotoResponse>(`${API_PREFIX}/photos/${encodeURIComponent(id)}`);
   }
 
   recordView(id: string, req: RecordViewRequest): Promise<PhotoResponse> {
-    return this.request<PhotoResponse>(`/api/v1/photos/${encodeURIComponent(id)}/views`, {
+    return this.request<PhotoResponse>(`${API_PREFIX}/photos/${encodeURIComponent(id)}/views`, {
       method: 'POST',
       body: JSON.stringify(req),
     });
   }
 
   adjustViewCount(id: string, action: AdjustViewRequest['action']): Promise<PhotoResponse> {
-    return this.request<PhotoResponse>(`/api/v1/photos/${encodeURIComponent(id)}/views`, {
+    return this.request<PhotoResponse>(`${API_PREFIX}/photos/${encodeURIComponent(id)}/views`, {
       method: 'PATCH',
       body: JSON.stringify({ action }),
     });
   }
 
   addTag(id: string, emoji: string): Promise<PhotoResponse> {
-    return this.request<PhotoResponse>(`/api/v1/photos/${encodeURIComponent(id)}/tags`, {
+    return this.request<PhotoResponse>(`${API_PREFIX}/photos/${encodeURIComponent(id)}/tags`, {
       method: 'POST',
       body: JSON.stringify({ emoji }),
     });
@@ -110,37 +119,37 @@ export class ApiClient {
 
   removeTag(id: string, emoji: string): Promise<PhotoResponse> {
     return this.request<PhotoResponse>(
-      `/api/v1/photos/${encodeURIComponent(id)}/tags/${encodeURIComponent(emoji)}`,
+      `${API_PREFIX}/photos/${encodeURIComponent(id)}/tags/${encodeURIComponent(emoji)}`,
       { method: 'DELETE' },
     );
   }
 
   listTags(): Promise<EmojiTagCountDTO[]> {
-    return this.request<EmojiTagCountDTO[]>('/api/v1/tags');
+    return this.request<EmojiTagCountDTO[]>(`${API_PREFIX}/tags`);
   }
 
   getLibraryStats(): Promise<LibraryStatsResponse> {
-    return this.request<LibraryStatsResponse>('/api/v1/library/stats');
+    return this.request<LibraryStatsResponse>(`${API_PREFIX}/library/stats`);
   }
 
   listDuplicates(): Promise<DuplicateGroupDTO[]> {
-    return this.request<DuplicateGroupDTO[]>('/api/v1/library/duplicates');
+    return this.request<DuplicateGroupDTO[]>(`${API_PREFIX}/library/duplicates`);
   }
 
   listMissing(): Promise<PhotoResponse[]> {
-    return this.request<PhotoResponse[]>('/api/v1/library/missing');
+    return this.request<PhotoResponse[]>(`${API_PREFIX}/library/missing`);
   }
 
   purgeMissing(): Promise<PurgeMissingResponse> {
-    return this.request<PurgeMissingResponse>('/api/v1/library/missing', { method: 'DELETE' });
+    return this.request<PurgeMissingResponse>(`${API_PREFIX}/library/missing`, { method: 'DELETE' });
   }
 
   triggerSync(asyncMode = false): Promise<SyncReportResponse> {
     const suffix = asyncMode ? '?async=true' : '';
-    return this.request<SyncReportResponse>(`/api/v1/library/sync${suffix}`, { method: 'POST' });
+    return this.request<SyncReportResponse>(`${API_PREFIX}/library/sync${suffix}`, { method: 'POST' });
   }
 
   getSyncStatus(): Promise<SyncReportResponse> {
-    return this.request<SyncReportResponse>('/api/v1/library/sync/status');
+    return this.request<SyncReportResponse>(`${API_PREFIX}/library/sync/status`);
   }
 }

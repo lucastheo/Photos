@@ -115,6 +115,7 @@ export class PhotoTrackerApp extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener('popstate', this.onPopState);
+    this.api.onUnauthorized = () => this.handleSessionExpired();
     void this.initializeApp();
   }
 
@@ -167,8 +168,9 @@ export class PhotoTrackerApp extends LitElement {
     try {
       this.activePhoto = await this.api.getPhoto(id);
       this.activeIndex = this.galleryView?.items.findIndex((p) => p.id === id) ?? -1;
-    } catch {
+    } catch (err) {
       this.activePhoto = null;
+      this.headerError = err instanceof ApiError ? err.message : 'Photo not found.';
     }
   }
 
@@ -207,6 +209,15 @@ export class PhotoTrackerApp extends LitElement {
     await this.refreshStats();
   }
 
+  private handleSessionExpired(): void {
+    if (this.session.auth_disabled || this.route === 'login') return;
+    this.session = { authenticated: false, auth_disabled: false };
+    this.stats = null;
+    this.activePhoto = null;
+    this.activeIndex = -1;
+    this.navigateTo('login', '/login');
+  }
+
   private async handleLogout(): Promise<void> {
     try {
       this.session = await this.api.logout();
@@ -223,11 +234,18 @@ export class PhotoTrackerApp extends LitElement {
     this.headerError = '';
     try {
       await this.api.triggerSync(false);
+    } catch (err) {
+      this.headerError = err instanceof ApiError ? err.message : 'Quick re-import failed.';
+      this.quickSyncing = false;
+      return;
+    }
+    try {
       await this.refreshStats();
       await this.galleryView?.loadGallery();
       await this.libraryView?.loadLibraryData();
     } catch (err) {
-      this.headerError = err instanceof ApiError ? err.message : 'Quick re-import failed.';
+      this.headerError =
+        err instanceof ApiError ? err.message : 'Re-import finished, but refreshing the view failed.';
     } finally {
       this.quickSyncing = false;
     }

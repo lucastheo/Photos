@@ -136,4 +136,19 @@ describe('ApiClient', () => {
     expect(err3).toBeInstanceOf(ApiError);
     expect((err3 as ApiError).message).toBe('Request failed');
   });
+
+  it('fires onUnauthorized on 401 except for login attempts', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(mockJsonResponse({ code: 'UNAUTHORIZED', message: 'no' }, 401))
+      .mockResolvedValueOnce(mockJsonResponse({ code: 'UNAUTHORIZED', message: 'bad' }, 401));
+    const client = new ApiClient('', fetchMock);
+    const onUnauthorized = vi.fn();
+    client.onUnauthorized = onUnauthorized;
+
+    await client.listTags().catch(() => undefined);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    await client.login('wrong').catch(() => undefined);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
 });

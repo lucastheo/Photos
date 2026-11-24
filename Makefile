@@ -5,7 +5,7 @@ build:
 	npm --prefix web run build
 
 run:
-	@trap 'trap - INT TERM EXIT; kill 0' INT TERM EXIT; \
+	@trap 'trap - INT TERM EXIT; kill $$(jobs -p) 2>/dev/null' INT TERM EXIT; \
 	go run ./cmd/phototracker & \
 	npm --prefix web run dev & \
 	wait
