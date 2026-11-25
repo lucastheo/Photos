@@ -101,10 +101,17 @@ func registerFallbackRoutes(mux *http.ServeMux, staticFS fs.FS) {
 	})
 }
 
+const (
+	staticImmutableCacheHeader = "public, max-age=3600, immutable"
+	staticHTMLCacheHeader      = "no-cache"
+	staticDefaultCacheHeader   = "public, max-age=3600"
+)
+
 func serveSPAOrStatic(w http.ResponseWriter, r *http.Request, staticFS fs.FS, fileServer http.Handler) {
 	cleanPath := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
-	if cleanPath != "" {
+	if cleanPath != "" && cleanPath != "index.html" {
 		if info, err := fs.Stat(staticFS, cleanPath); err == nil && !info.IsDir() {
+			w.Header().Set("Cache-Control", staticCacheControl(cleanPath))
 			fileServer.ServeHTTP(w, r)
 			return
 		}
@@ -113,7 +120,18 @@ func serveSPAOrStatic(w http.ResponseWriter, r *http.Request, staticFS fs.FS, fi
 			return
 		}
 	}
+	w.Header().Set("Cache-Control", staticHTMLCacheHeader)
 	r2 := r.Clone(r.Context())
 	r2.URL.Path = "/"
 	fileServer.ServeHTTP(w, r2)
+}
+
+func staticCacheControl(cleanPath string) string {
+	if strings.HasPrefix(cleanPath, "assets/") {
+		return staticImmutableCacheHeader
+	}
+	if strings.HasSuffix(cleanPath, ".html") {
+		return staticHTMLCacheHeader
+	}
+	return staticDefaultCacheHeader
 }

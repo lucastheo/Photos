@@ -1,0 +1,17 @@
+.git/
+bin/
+coverage.out
+data/
+photos/
+*.db
+*.db-wal
+*.db-shm
+*.bak.*
+.env
+.env.*
+web/node_modules/
+web/dist/
+web/coverage/
+e2e/
+docs/
+.DS_Store

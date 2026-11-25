@@ -20,6 +20,7 @@ import (
 	"github.com/lucastheo/photos/internal/adapter/sqlite"
 	"github.com/lucastheo/photos/internal/config"
 	"github.com/lucastheo/photos/internal/usecase"
+	"github.com/lucastheo/photos/web"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -48,8 +49,12 @@ func runMain(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	staticFS, err := web.DistFS()
+	if err != nil {
+		return fmt.Errorf("load embedded frontend: %w", err)
+	}
 	logger := newLogger(cfg)
-	app, err := buildApplication(ctx, cfg, logger, nil)
+	app, err := buildApplication(ctx, cfg, logger, staticFS)
 	if err != nil {
 		return err
 	}

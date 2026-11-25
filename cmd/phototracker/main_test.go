@@ -22,6 +22,7 @@ import (
 	"github.com/lucastheo/photos/internal/adapter/sqlite"
 	"github.com/lucastheo/photos/internal/config"
 	"github.com/lucastheo/photos/internal/domain"
+	"github.com/lucastheo/photos/web"
 )
 
 func TestHelpersAndLoggerConfig(t *testing.T) {
@@ -84,7 +85,11 @@ func TestApp_Integration_FullConcreteWiringAndGracefulShutdown(t *testing.T) {
 	cfg.CachePath = cacheDir
 	cfg.AuthPassword = "app-password"
 
-	app, err := buildApplication(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	staticFS, err := web.DistFS()
+	if err != nil {
+		t.Fatalf("web.DistFS failed: %v", err)
+	}
+	app, err := buildApplication(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), staticFS)
 	if err != nil {
 		t.Fatalf("buildApplication failed: %v", err)
 	}
@@ -103,7 +108,19 @@ func TestApp_Integration_FullConcreteWiringAndGracefulShutdown(t *testing.T) {
 	}
 	client := &http.Client{Jar: jar}
 
-	// Verify stale run recovered on startup via health + login + sync status.
+	// Verify embedded SPA routes serve index.html with no-cache and health returns JSON 200.
+	for _, spaRoute := range []string{"/", "/library"} {
+		spaResp, spaErr := client.Get(srv.URL + spaRoute)
+		if spaErr != nil || spaResp.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s = (%v, %v)", spaRoute, spaResp, spaErr)
+		}
+		spaBody, _ := io.ReadAll(spaResp.Body)
+		_ = spaResp.Body.Close()
+		if !strings.Contains(string(spaBody), "<photo-tracker-app>") || spaResp.Header.Get("Cache-Control") != "no-cache" {
+			t.Fatalf("GET %s unexpected SPA response (cc=%q)", spaRoute, spaResp.Header.Get("Cache-Control"))
+		}
+	}
+
 	resp, err := client.Get(srv.URL + "/api/v1/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /health = (%v, %v)", resp, err)
