@@ -218,6 +218,8 @@ func TestRouterAuthAndSPAFallbackUnit(t *testing.T) {
 	spaFS := fstest.MapFS{
 		"index.html":    &fstest.MapFile{Data: []byte("<html>SPA</html>")},
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('ok')")},
+		"favicon.ico":   &fstest.MapFile{Data: []byte("ico")},
+		"nested.html":   &fstest.MapFile{Data: []byte("<html>nested</html>")},
 	}
 
 	rt := httpapi.NewRouter(httpapi.RouterConfig{
@@ -244,16 +246,30 @@ func TestRouterAuthAndSPAFallbackUnit(t *testing.T) {
 	}
 	syncSvc.pingErr = nil
 
-	// SPA asset and fallback routes
+	// SPA asset and fallback routes with cache headers
 	rec = httptest.NewRecorder()
 	rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/assets/app.js", nil))
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "console.log") {
-		t.Fatalf("static asset = (%d, %q)", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "console.log") ||
+		rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+		t.Fatalf("static asset = (%d, cc=%q, %q)", rec.Code, rec.Header().Get("Cache-Control"), rec.Body.String())
 	}
 	rec = httptest.NewRecorder()
-	rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/library", nil))
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "SPA") {
-		t.Fatalf("SPA fallback = (%d, %q)", rec.Code, rec.Body.String())
+	rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/favicon.ico", nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "public, max-age=3600" {
+		t.Fatalf("favicon = (%d, cc=%q)", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	rec = httptest.NewRecorder()
+	rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/nested.html", nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("nested.html = (%d, cc=%q)", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	for _, spaPath := range []string{"/", "/index.html", "/library", "/photo/abc"} {
+		rec = httptest.NewRecorder()
+		rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, spaPath, nil))
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "SPA") ||
+			rec.Header().Get("Cache-Control") != "no-cache" {
+			t.Fatalf("SPA fallback %s = (%d, cc=%q, %q)", spaPath, rec.Code, rec.Header().Get("Cache-Control"), rec.Body.String())
+		}
 	}
 	rec = httptest.NewRecorder()
 	rt.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/missing.css", nil))

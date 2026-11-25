@@ -148,10 +148,10 @@ flowchart TD
 **Goal:** Embed the compiled frontend assets into the Go binary (`//go:embed`), build the standalone black-box Playwright E2E test program (`e2e/`), and document configuration and usage.
 
 ### Tasks
-- [ ] **5.1 Single-Binary Static Embedding & Containerization (`Dockerfile` & `docker-compose.yml`):**
+- [x] **5.1 Single-Binary Static Embedding & Containerization (`Dockerfile` & `docker-compose.yml`):**
   - Embed `web/dist` into the Go HTTP router with SPA fallback and cache headers.
   - Create multi-stage `Dockerfile` (bundling the compiled Go binary with `exiftool`, `ffmpeg`, and `libheif-examples`, non-root user, and `/api/v1/health` `HEALTHCHECK`) and `docker-compose.yml` mounting `/photos:ro` (read-only) and `/data`.
-- [ ] **5.2 Standalone Black-Box Playwright E2E Program (`e2e/` — `make test-e2e`):**
+- [x] **5.2 Standalone Black-Box Playwright E2E Program (`e2e/` — `make test-e2e`):**
   - Create an isolated `e2e/` test harness that compiles and starts the full Go binary + embedded frontend against a temporary `LIBRARY_PATH`, `DB_PATH`, and `CACHE_PATH`.
   - Implement the 5 core Playwright browser journeys:
     1. **Auth Flow:** Login screen redirect, password login, `HttpOnly` cookie persistence across reload, and logout.
@@ -159,7 +159,7 @@ flowchart TD
     3. **1.5s Dwell Counter, Emoji Tagging & Manual Controls:** Verify fast skip (`< 1.5s`, stays `0`) vs. dwell (`>= 1.5s`, increments to `1` and persists on `F5`), manual `+1` / `-1` / `Reset` buttons, and adding an emoji tag (`❤️`) in the lightbox then filtering the gallery by `❤️`.
     4. **Slideshow Mode:** Start slideshow in `<dialog>` lightbox and verify auto-advance increments view counts.
     5. **Disk Rename + Re-import:** Rename/move a viewed photo file on disk during the test, click **"Re-import"** in `/library`, and verify `view_count` is preserved under the new filename.
-- [ ] **5.3 User, Feature & Operational Documentation (`README.md` & `docs/FEATURES.md`):**
+- [x] **5.3 User, Feature & Operational Documentation (`README.md` & `docs/FEATURES.md`):**
   - Write `README.md` covering quickstart (native & Docker Compose), `.env` / CLI flags (`LIBRARY_PATH`, `DB_PATH`, `CACHE_PATH`, `PORT`, `AUTH_DISABLED`, `AUTH_PASSWORD`, `SYNC_WORKERS`), external media dependencies (`exiftool`, `ffmpeg`, `libheif`), and backup/sharing instructions for the SQLite database.
   - Write `docs/FEATURES.md` documenting how View Counting (1.5s dwell + manual controls), `RAW + JPEG` Stacking, Exact Duplicate Tracking, Emoji Tagging, GPS Filtering, and Incremental Re-import work.
 

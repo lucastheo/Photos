@@ -1,8 +1,8 @@
 .PHONY: build run run-api run-web seed-examples test-unit test-integration test-coverage test-perf test-e2e lint lint-max-file check
 
 build:
-	go build -o bin/phototracker ./cmd/phototracker
 	npm --prefix web run build
+	go build -o bin/phototracker ./cmd/phototracker
 
 run:
 	@trap 'trap - INT TERM EXIT; kill $$(jobs -p) 2>/dev/null' INT TERM EXIT; \
@@ -40,9 +40,9 @@ test-perf:
 		echo "Skipping E2E perf benchmarks (e2e/ scheduled for Phase 5/6)."; \
 	fi
 
-test-e2e:
+test-e2e: build
 	@if [ -f e2e/package.json ]; then \
-		npm --prefix e2e test; \
+		E2E_BINARY="$(CURDIR)/bin/phototracker" npm --prefix e2e test; \
 	else \
 		echo "Skipping E2E tests (e2e/ scheduled for Phase 5)."; \
 	fi
@@ -60,5 +60,8 @@ lint:
 	fi
 	npm --prefix web run lint
 	npm --prefix web run typecheck
+	@if [ -f e2e/package.json ]; then \
+		npm --prefix e2e run typecheck; \
+	fi
 
 check: lint-max-file lint test-coverage test-e2e test-perf
